@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#1a1a2e"/>
+      <stop offset="100%" stop-color="#16213e"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="100" y1="100" x2="400" y2="400" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#ff6b35"/>
+      <stop offset="100%" stop-color="#f7931e"/>
+    </linearGradient>
+  </defs>
+  <!-- Background rounded square -->
+  <rect width="512" height="512" rx="96" fill="url(#bg)"/>
+  <!-- Node 1 (top-left) -->
+  <rect x="80" y="100" width="140" height="80" rx="12" fill="#2a2a4a" stroke="#ff6b35" stroke-width="3"/>
+  <circle cx="220" cy="140" r="8" fill="#ff6b35"/>
+  <line x1="82" y1="100" x2="220" y2="100" stroke="#ff6b35" stroke-width="3" stroke-linecap="round"/>
+  <!-- Node 2 (center-right) -->
+  <rect x="290" y="200" width="140" height="80" rx="12" fill="#2a2a4a" stroke="#a855f7" stroke-width="3"/>
+  <circle cx="290" cy="240" r="8" fill="#a855f7"/>
+  <circle cx="430" cy="240" r="8" fill="#a855f7"/>
+  <line x1="292" y1="200" x2="430" y2="200" stroke="#a855f7" stroke-width="3" stroke-linecap="round"/>
+  <!-- Node 3 (bottom-left) -->
+  <rect x="80" y="310" width="140" height="80" rx="12" fill="#2a2a4a" stroke="#22c55e" stroke-width="3"/>
+  <circle cx="220" cy="350" r="8" fill="#22c55e"/>
+  <line x1="82" y1="310" x2="220" y2="310" stroke="#22c55e" stroke-width="3" stroke-linecap="round"/>
+  <!-- Connection lines (curved) -->
+  <path d="M 228 140 C 260 140, 260 240, 290 240" stroke="url(#accent)" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <path d="M 228 350 C 260 350, 260 240, 290 240" stroke="#22c55e" stroke-width="3" fill="none" stroke-linecap="round" opacity="0.7"/>
+  <!-- Small decorative dots inside nodes -->
+  <rect x="96" y="122" width="50" height="6" rx="3" fill="#555" opacity="0.6"/>
+  <rect x="96" y="136" width="80" height="6" rx="3" fill="#555" opacity="0.4"/>
+  <rect x="96" y="150" width="60" height="6" rx="3" fill="#555" opacity="0.3"/>
+  <rect x="306" y="222" width="50" height="6" rx="3" fill="#555" opacity="0.6"/>
+  <rect x="306" y="236" width="80" height="6" rx="3" fill="#555" opacity="0.4"/>
+  <rect x="306" y="250" width="60" height="6" rx="3" fill="#555" opacity="0.3"/>
+  <rect x="96" y="332" width="50" height="6" rx="3" fill="#555" opacity="0.6"/>
+  <rect x="96" y="346" width="80" height="6" rx="3" fill="#555" opacity="0.4"/>
+  <rect x="96" y="360" width="60" height="6" rx="3" fill="#555" opacity="0.3"/>
+</svg>

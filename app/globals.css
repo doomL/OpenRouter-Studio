@@ -46,10 +46,18 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+
+  /* Studio canvas custom colors */
+  --color-studio-bg: var(--studio-bg);
+  --color-studio-canvas: var(--studio-canvas);
+  --color-studio-node: var(--studio-node);
+  --color-studio-node-border: var(--studio-node-border);
+  --color-studio-node-input: var(--studio-node-input);
+  --color-studio-dots: var(--studio-dots);
 }
 
 :root {
-  --background: oklch(1 0 0);
+  --background: oklch(0.985 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
@@ -64,8 +72,8 @@
   --accent: oklch(0.97 0 0);
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
+  --border: oklch(0.88 0 0);
+  --input: oklch(0.88 0 0);
   --ring: oklch(0.708 0 0);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
@@ -81,6 +89,14 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+
+  /* Studio — light */
+  --studio-bg: #f5f5f5;
+  --studio-canvas: #fafafa;
+  --studio-node: #ffffff;
+  --studio-node-border: #d4d4d4;
+  --studio-node-input: #f0f0f0;
+  --studio-dots: #d4d4d4;
 }
 
 .dark {
@@ -115,6 +131,14 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+
+  /* Studio — dark */
+  --studio-bg: #0f0f0f;
+  --studio-canvas: #141414;
+  --studio-node: #1e1e1e;
+  --studio-node-border: #333333;
+  --studio-node-input: #141414;
+  --studio-dots: #333333;
 }
 
 @layer base {
@@ -127,4 +151,38 @@
   html {
     @apply font-sans;
   }
+}
+
+/* React Flow: edge selection & hover */
+.react-flow__edge.selectable:hover .react-flow__edge-path {
+  stroke: #f97316 !important;
+  stroke-width: 3 !important;
+}
+.react-flow__edge.selected .react-flow__edge-path,
+.react-flow__edge.selectable:focus .react-flow__edge-path,
+.react-flow__edge.selectable:focus-visible .react-flow__edge-path {
+  stroke: #ef4444 !important;
+  stroke-width: 3 !important;
+}
+.react-flow {
+  --xy-edge-stroke-selected: #ef4444;
+}
+
+/* Animated edge glow for active data flow */
+.react-flow__edge.animated .react-flow__edge-path {
+  stroke-dasharray: 5 5;
+  animation: edgeFlow 0.5s linear infinite;
+}
+@keyframes edgeFlow {
+  to {
+    stroke-dashoffset: -10;
+  }
+}
+
+/* Invalid connection indicator */
+.react-flow__connection .react-flow__connection-path {
+  stroke-width: 2;
+}
+.react-flow .react-flow__handle.connectionindicator {
+  cursor: crosshair;
 }

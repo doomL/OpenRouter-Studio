@@ -1,0 +1,119 @@
+"use client";
+
+import { memo, useCallback, useMemo } from "react";
+import { Handle, Position, type NodeProps } from "@xyflow/react";
+import { Button } from "@/components/ui/button";
+import { useStudioStore } from "@/lib/store";
+import { HandleLabel } from "@/components/canvas/HandleLabel";
+
+function OutputNodeComponent({ id }: NodeProps) {
+  const edges = useStudioStore((s) => s.edges);
+  const nodeOutputs = useStudioStore((s) => s.nodeOutputs);
+
+  // Derive display values from upstream nodes only — no effect, no self-write
+  const { text, imageUrl, videoUrl } = useMemo(() => {
+    const incomingEdges = edges.filter((e) => e.target === id);
+    let text: string | undefined;
+    let imageUrl: string | undefined;
+    let videoUrl: string | undefined;
+
+    for (const edge of incomingEdges) {
+      const src = nodeOutputs[edge.source];
+      if (!src) continue;
+      const sh = edge.sourceHandle || "";
+      const th = edge.targetHandle || "";
+
+      if (th === "text" && (sh === "prompt" || sh === "text") && src.text) {
+        text = src.text;
+      }
+      if (th === "image_url" && src.image_url) {
+        imageUrl = src.image_url;
+      }
+      if (th === "video_url" && src.video_url) {
+        videoUrl = src.video_url;
+      }
+    }
+    return { text, imageUrl, videoUrl };
+  }, [id, edges, nodeOutputs]);
+
+  const handleDownload = useCallback(
+    (url: string, ext: string) => {
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `output-${id}.${ext}`;
+      a.click();
+    },
+    [id]
+  );
+
+  return (
+    <div className="min-w-[360px] max-w-[480px] rounded-lg border border-studio-node-border bg-studio-node shadow-lg relative">
+      <div className="rounded-t-lg bg-gray-600 px-3 py-1.5 text-xs font-semibold text-white">
+        Output
+      </div>
+      <div className="p-3 space-y-2 nopan nodrag nowheel">
+        {text && (
+          <div className="max-h-[400px] overflow-auto rounded bg-studio-node-input p-3 text-xs text-muted-foreground whitespace-pre-wrap leading-relaxed">
+            {text}
+          </div>
+        )}
+
+        {imageUrl && (
+          <div className="space-y-1">
+            <img
+              src={imageUrl}
+              alt="output"
+              className="w-full max-h-[360px] rounded bg-studio-node-input object-contain"
+            />
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-6 text-[10px] w-full"
+              onClick={() => handleDownload(imageUrl, "png")}
+            >
+              Download Image
+            </Button>
+          </div>
+        )}
+
+        {videoUrl && (
+          <div className="space-y-1">
+            <video
+              controls
+              src={videoUrl}
+              className="w-full max-h-[300px] rounded bg-black"
+            />
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-6 text-[10px] w-full"
+              onClick={() => handleDownload(videoUrl, "mp4")}
+            >
+              Download Video
+            </Button>
+          </div>
+        )}
+
+        {!text && !imageUrl && !videoUrl && (
+          <div className="py-8 text-center text-sm text-muted-foreground">
+            Connect a node to see output
+          </div>
+        )}
+      </div>
+
+      <Handle type="target" position={Position.Left} id="text" style={{ top: "30%" }}
+        className="!w-3 !h-3 !bg-purple-400 !border-2 !border-purple-600" />
+      <HandleLabel label="text" side="left" top="30%" />
+
+      <Handle type="target" position={Position.Left} id="image_url" style={{ top: "50%" }}
+        className="!w-3 !h-3 !bg-green-500 !border-2 !border-green-700" />
+      <HandleLabel label="image" side="left" top="50%" />
+
+      <Handle type="target" position={Position.Left} id="video_url" style={{ top: "70%" }}
+        className="!w-3 !h-3 !bg-blue-400 !border-2 !border-blue-600" />
+      <HandleLabel label="video" side="left" top="70%" />
+    </div>
+  );
+}
+
+export const OutputNode = memo(OutputNodeComponent);
