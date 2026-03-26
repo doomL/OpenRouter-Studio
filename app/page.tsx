@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
+import { ThemedLogo } from "@/components/theme/ThemedLogo";
 import {
   BotIcon,
   ImageIcon,
@@ -102,7 +103,7 @@ export default function LandingPage() {
       <nav className="border-b border-border">
         <div className="mx-auto max-w-6xl flex items-center justify-between px-6 py-4">
           <div className="flex items-center gap-2.5">
-            <img src="/favicon.svg" alt="Logo" className="h-7 w-7" />
+            <ThemedLogo className="h-7 w-7" />
             <span className="text-base font-bold tracking-tight">
               <span className="text-[#ff6b35]">OpenRouter</span>{" "}
               <span className="text-foreground">Studio</span>
@@ -311,7 +312,7 @@ export default function LandingPage() {
       <footer className="border-t border-border py-8">
         <div className="mx-auto max-w-6xl px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <img src="/favicon.svg" alt="Logo" className="h-5 w-5" />
+            <ThemedLogo className="h-5 w-5" />
             <span className="text-sm text-muted-foreground">OpenRouter Studio</span>
           </div>
           <div className="flex items-center gap-6">

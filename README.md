@@ -1,33 +1,47 @@
+<p align="center">
+  <img src="public/favicon.svg#gh-light-mode-only" width="72" height="72" alt="OpenRouter Studio" />
+  <img src="public/favicon_dark.svg#gh-dark-mode-only" width="72" height="72" alt="OpenRouter Studio" />
+</p>
+
 # OpenRouter Studio
 
-A visual, node-based canvas for chaining **LLM chat**, **image generation**, and **video generation** through [OpenRouter](https://openrouter.ai). Build pipelines by connecting nodes—no glue code. **Bring your own OpenRouter API key**; usage is billed by OpenRouter.
+<p align="center">
+  A <strong>visual node canvas</strong> for chaining <strong>LLM</strong>, <strong>image</strong>, and <strong>video</strong> models through <a href="https://openrouter.ai">OpenRouter</a>. Wire nodes, run pipelines, no glue code.
+</p>
 
-**Repository:** [github.com/doomL/OpenRouter-Studio](https://github.com/doomL/OpenRouter-Studio)
+<p align="center">
+  <a href="https://github.com/doomL/OpenRouter-Studio">GitHub</a>
+  ·
+  <a href="https://openrouter.ai">OpenRouter</a>
+</p>
 
-## What you get
+---
 
-- **React Flow canvas** — Drag nodes from the palette, wire outputs to inputs, run nodes or the whole graph.
-- **LLM nodes** — Chat completions (and vision where the model supports it). Pick any model exposed by OpenRouter; pricing hints come from the models API when available.
-- **Image nodes** — Text-to-image and image-to-image with reference inputs; images flow through the graph as base64/data URLs.
-- **Video nodes** — Submit async video jobs, poll status, preview and download via proxied API routes (OpenRouter alpha video API).
-- **Supporting nodes** — Prompt, image/video inputs, notes, and a consolidated output node.
-- **Auth (cloud path)** — Register / sign in with **NextAuth.js** (credentials) and **Prisma** + **SQLite** (default `DATABASE_URL` is `file:./dev.db` at the project root). The **studio** route is protected by middleware; the landing and auth pages are public.
-- **API proxy** — Browser calls go to Next.js **Route Handlers** under `/api/openrouter/*` and `/api/utils/*`, so your API key is not sent from the client to `openrouter.ai` directly (you still configure the key in the app).
-- **Per-account studio sync** — While signed in, your **OpenRouter API key** (encrypted at rest with `AUTH_SECRET`), **canvas**, **saved workflows**, **theme**, and **video job metadata** are stored in SQLite and synced across devices. Only **theme** is also cached locally for faster first paint. Export/import JSON still works for backups.
+## Why use it
 
-## Quick start
+| | |
+|--|--|
+| **Canvas** | Drag nodes from a palette, connect outputs to inputs, run one node or **Run all** in dependency order. |
+| **Models** | Anything OpenRouter exposes—chat, vision-capable models, image generators, video jobs (alpha APIs where applicable). |
+| **Your key** | Bring your own OpenRouter API key; usage is billed by OpenRouter. The app proxies requests through your server so the key is not sent straight from the browser to `openrouter.ai`. |
+| **Accounts** | Sign up to sync **encrypted API key** (with `AUTH_SECRET`), **canvas**, **saved workflows**, **theme**, and **video job metadata** in SQLite—pick up where you left off on another device. |
+| **Self-host** | Run locally or in Docker; export/import workflows as JSON for backups. |
+
+---
+
+## Quick start (local)
 
 ```bash
 npm install
 cp .env.example .env
-# Edit .env: set AUTH_SECRET (e.g. openssl rand -base64 32) and NEXTAUTH_URL for your deployment.
-npx prisma migrate dev   # create SQLite DB when using auth
+# Set AUTH_SECRET (e.g. openssl rand -base64 32) and NEXTAUTH_URL in .env
+npx prisma migrate dev   # creates SQLite DB for auth
 npm run dev
 ```
 
-OpenRouter API keys are **not** set in `.env` — enter your key in the Studio UI when prompted.
+Open [http://localhost:3000](http://localhost:3000), register or sign in, then paste your **OpenRouter API key** in the studio when prompted (keys are not required in `.env` for local dev).
 
-Open [http://localhost:3000](http://localhost:3000). Create an account or use **Self-host** / GitHub instructions on the landing page; in the studio, paste your **OpenRouter API key** when prompted.
+---
 
 ## Production
 
@@ -36,73 +50,66 @@ npm run build
 npm start
 ```
 
-Set `NEXTAUTH_URL` and `AUTH_SECRET` (or `NEXTAUTH_SECRET`) for auth in production. `AUTH_SECRET` is also used to encrypt stored OpenRouter keys in the database.
+Set **`NEXTAUTH_URL`** and **`AUTH_SECRET`** to match your public URL and a long random secret. `AUTH_SECRET` also encrypts stored OpenRouter keys in the database.
+
+---
 
 ## Docker
 
-The image uses **Next.js standalone** output. On each start, the container runs **`prisma migrate deploy`** (see `docker-entrypoint.sh`) so SQLite tables exist before the server boots. The app runs as user **`nextjs`** with a writable `/app` tree for `dev.db`.
+Images use **Next.js standalone**. Each container start runs **`prisma migrate deploy`** (`docker-entrypoint.sh`) so the schema exists before `node server.js`. The process runs as **`nextjs`** with a writable `/app` for SQLite.
 
-### Prerequisites
+**1. Environment**
 
-1. Copy env template and set secrets (same as local dev):
+```bash
+cp .env.example .env
+```
 
-   ```bash
-   cp .env.example .env
-   ```
+Minimum in **`.env`**: **`AUTH_SECRET`**, **`NEXTAUTH_URL`** (no trailing slash). **`DATABASE_URL`** defaults to `file:./dev.db` inside the container.
 
-2. In **`.env`**, at minimum:
-
-   - **`AUTH_SECRET`** — long random string (e.g. `openssl rand -base64 32`). Used by NextAuth and to encrypt stored OpenRouter keys.
-   - **`NEXTAUTH_URL`** — URL you open in the browser, **no trailing slash** (e.g. `http://localhost:3000`).
-
-   **`DATABASE_URL`** defaults to `file:./dev.db` (SQLite file inside the container). **`OPENROUTER_API_KEY`** is still optional here; users can enter the key in the Studio UI.
-
-### Run
+**2. Run**
 
 ```bash
 docker compose build
 docker compose up -d
 ```
 
-If **port 3000 is already in use** (for example `npm run dev`), publish another host port:
+**Port in use?** (e.g. dev server on 3000)
 
 ```bash
 APP_PORT=3080 docker compose up -d
 ```
 
-Then open `http://localhost:3080` and set **`NEXTAUTH_URL=http://localhost:3080`** in `.env` (or pass it in the shell for that run) so NextAuth matches the URL you use.
+Use **`NEXTAUTH_URL=http://localhost:3080`** (or your real origin) so NextAuth matches the URL in the browser.
 
-Compose loads **`.env`** when present (`required: false` if the file is missing). It sets **`AUTH_TRUST_HOST=true`** so NextAuth accepts requests when the Host header differs from the container hostname (typical behind port mapping or a reverse proxy). Override **`NEXTAUTH_URL`** if you publish the app on another origin.
+Compose may load **`.env`**; it sets **`AUTH_TRUST_HOST=true`** for port mapping and reverse proxies. Persist SQLite with a **volume** on `/app/dev.db` (or similar) if you need data to survive container removal.
 
-Open [http://localhost:3000](http://localhost:3000) (or whatever host/port you mapped). Register, sign in, then use the studio.
+---
 
-### Notes
-
-- **Host port** defaults to **3000**; override with **`APP_PORT`** (see above).
-- **SQLite data** lives **inside the container** by default; removing the container removes the database. To persist it, add a **volume** for `/app/dev.db` or point `DATABASE_URL` at a mounted file path.
-- **`.dockerignore`** excludes `dev.db`, `.env`, and `*.db` so local secrets and databases are not copied into the build context.
-
-## Tech stack
+## Stack
 
 | Area | Choice |
 |------|--------|
 | Framework | **Next.js 16** (App Router) |
-| UI | **React 19**, **Tailwind CSS** v4, **shadcn/ui** (Base UI) |
+| UI | **React 19**, **Tailwind CSS** v4, **Base UI** / shadcn-style components |
 | Canvas | **@xyflow/react** (React Flow v12) |
-| State | **Zustand** (graph + UI; theme in `localStorage`, rest synced per user via `/api/settings/studio`) |
+| State | **Zustand** (graph + UI; theme + sync via `/api/settings/studio` when signed in) |
 | Auth | **NextAuth.js v5**, **@auth/prisma-adapter** |
-| Database | **Prisma 7** + **better-sqlite3** driver adapter |
-| Types | **TypeScript** |
+| Database | **Prisma 7**, **SQLite**, **better-sqlite3** adapter |
+| Language | **TypeScript** |
+
+---
 
 ## How it works (short)
 
-1. Sign in; the studio loads your saved key and graph from the server (after the first sync, changes save automatically with a short debounce).
-2. Add nodes (prompt, LLM, image, video, inputs, etc.) and connect handles.
-3. Configure models and parameters per node; use **Run** / **Run all** where implemented.
-4. LLM/image/video requests are executed from the server via your OpenRouter key; video jobs are polled until complete, then assets are fetched through the app’s download route.
+1. After sign-in, the studio loads your saved state from the server; edits debounce and sync automatically.
+2. Add **Prompt**, **LLM**, **Image**, **Video**, input nodes, **Notes**, and **Output**; connect compatible handles.
+3. Choose models and parameters per node; run steps individually or use **Run all** where supported.
+4. Server route handlers call OpenRouter with your key; video flows use polling and proxied downloads.
 
-For deeper behavior (models, image/video payloads), see `openrouter-studio-prompt.md` and the `app/api/openrouter` routes in the repo.
+For payload details and model notes, see **`openrouter-studio-prompt.md`** and **`app/api/openrouter/`**.
+
+---
 
 ## License
 
-See the repository license file (e.g. MIT if specified in the repo).
+See the license file in the repository (e.g. MIT if specified).

@@ -38,6 +38,7 @@ import { useStudioCloudSync } from "@/components/studio/useStudioCloudSync";
 import { saveStudioSettingsToServer } from "@/lib/studio-settings-api";
 import { getCanvasViewportFloatingProps } from "@/lib/canvas-floating-props";
 import { formatWorkflowSavedAt } from "@/lib/utils";
+import { ThemedLogo } from "@/components/theme/ThemedLogo";
 import { toast } from "@/lib/toast";
 
 export default function StudioPage() {
@@ -197,7 +198,7 @@ export default function StudioPage() {
         {/* Header */}
         <header className="flex h-12 flex-shrink-0 items-center justify-between border-b border-studio-node-border bg-studio-bg px-4">
           <div className="flex items-center gap-2.5">
-            <img src="/favicon.svg" alt="Logo" className="h-6 w-6" />
+            <ThemedLogo className="h-6 w-6" />
             <span className="text-sm font-bold tracking-tight">
               <span className="text-[#ff6b35]">OpenRouter</span>{" "}
               <span className="text-foreground">Studio</span>

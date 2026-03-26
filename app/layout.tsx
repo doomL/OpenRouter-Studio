@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import { SessionProvider } from "@/components/providers/SessionProvider";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
+import { ThemeFavicon } from "@/components/theme/ThemeFavicon";
 import { AppToaster } from "@/components/ui/app-toaster";
 import "./globals.css";
 
@@ -37,6 +38,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
         <SessionProvider>
           <ThemeProvider>
+            <ThemeFavicon />
             {children}
             <AppToaster />
           </ThemeProvider>

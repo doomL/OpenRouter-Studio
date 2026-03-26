@@ -5,6 +5,7 @@ import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
+import { ThemedLogo } from "@/components/theme/ThemedLogo";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -58,7 +59,7 @@ export default function RegisterPage() {
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center gap-2">
-            <img src="/favicon.svg" alt="Logo" className="h-8 w-8" />
+            <ThemedLogo className="h-8 w-8" />
             <span className="text-lg font-bold">
               <span className="text-[#ff6b35]">OpenRouter</span>{" "}
               <span className="text-foreground">Studio</span>
