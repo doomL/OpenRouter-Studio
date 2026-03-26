@@ -9,7 +9,8 @@ FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN npm run build
+# Generated client is gitignored; must exist before `next build` (imports `@/lib/generated/prisma/client`)
+RUN npx prisma generate && npm run build
 
 FROM base AS runner
 WORKDIR /app
