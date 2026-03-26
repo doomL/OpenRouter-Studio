@@ -9,6 +9,9 @@ services:
       - path: .env
         required: false
     environment:
+      # Always listen on :3000 inside the container. `ports` maps host APP_PORT → 3000.
+      # (`.env` often sets PORT=3080 for local dev; that would break the 3080:3000 mapping.)
+      PORT: "3000"
       # NextAuth behind Docker port mapping / reverse proxy
       AUTH_TRUST_HOST: "true"
       # Must match the URL you open in the browser (host + port)

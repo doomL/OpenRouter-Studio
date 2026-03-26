@@ -92,6 +92,8 @@ Or edit `.env` before `docker compose up`. NextAuth must use the same origin you
 
 Compose may load **`.env`**; it sets **`AUTH_TRUST_HOST=true`** for port mapping and reverse proxies. Persist SQLite with a **volume** on `/app/dev.db` (or similar) if you need data to survive container removal.
 
+**nginx on the same host:** The app listens on **`127.0.0.1:${APP_PORT:-3080}`** on the host (mapped to port **3000** inside the container). Point your `server` / `location` at that upstream, for example `proxy_pass http://127.0.0.1:3080;`. Set **`NEXTAUTH_URL`** to your public `https://your.domain` (no trailing slash). The hostname in container logs (e.g. `f5030adb7722`) is only valid *inside* Docker—not the URL you use in nginx or a browser.
+
 ---
 
 ## Stack
