@@ -2,8 +2,8 @@ services:
   openrouter-studio:
     build: .
     ports:
-      # Use APP_PORT=3080 docker compose up if 3000 is already taken (e.g. npm run dev)
-      - "${APP_PORT:-3000}:3000"
+      # Host port → container :3000 (override with APP_PORT in `.env`)
+      - "${APP_PORT:-3080}:3000"
     restart: unless-stopped
     env_file:
       - path: .env
@@ -11,5 +11,5 @@ services:
     environment:
       # NextAuth behind Docker port mapping / reverse proxy
       AUTH_TRUST_HOST: "true"
-      # Override if the app is not at http://localhost:3000
-      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
+      # Must match the URL you open in the browser (host + port)
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3080}

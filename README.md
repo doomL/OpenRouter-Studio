@@ -49,7 +49,7 @@ npx prisma migrate dev   # creates SQLite DB for auth
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000), register or sign in, then paste your **OpenRouter API key** in the studio when prompted (keys are not required in `.env` for local dev).
+With the example `.env`, the dev server uses **port 3080** (see `PORT` and `NEXTAUTH_URL`). Open [http://localhost:3080](http://localhost:3080), register or sign in, then paste your **OpenRouter API key** in the studio when prompted (keys are not required in `.env` for local dev).
 
 ---
 
@@ -82,13 +82,13 @@ Minimum in **`.env`**: **`AUTH_SECRET`**, **`NEXTAUTH_URL`** (no trailing slash)
 docker compose up --build -d
 ```
 
-**Port in use?** (e.g. dev server on 3000)
+**Different host port?** Set **`APP_PORT`** (and matching **`NEXTAUTH_URL`**) in `.env`, for example:
 
 ```bash
-APP_PORT=3080 docker compose up --build -d
+APP_PORT=3000 NEXTAUTH_URL=http://localhost:3000 docker compose up --build -d
 ```
 
-Use **`NEXTAUTH_URL=http://localhost:3080`** (or your real origin) so NextAuth matches the URL in the browser.
+Or edit `.env` before `docker compose up`. NextAuth must use the same origin you open in the browser.
 
 Compose may load **`.env`**; it sets **`AUTH_TRUST_HOST=true`** for port mapping and reverse proxies. Persist SQLite with a **volume** on `/app/dev.db` (or similar) if you need data to survive container removal.
 
