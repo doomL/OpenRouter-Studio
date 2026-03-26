@@ -3,28 +3,38 @@
   <img src="public/favicon_dark.svg#gh-dark-mode-only" width="72" height="72" alt="OpenRouter Studio" />
 </p>
 
-# OpenRouter Studio
+<h1 align="center">OpenRouter Studio</h1>
 
 <p align="center">
-  A <strong>visual node canvas</strong> for chaining <strong>LLM</strong>, <strong>image</strong>, and <strong>video</strong> models through <a href="https://openrouter.ai">OpenRouter</a>. Wire nodes, run pipelines, no glue code.
+  <strong>Visual node canvas</strong> for chaining <strong>LLM</strong>, <strong>image</strong>, and <strong>video</strong> models via <a href="https://openrouter.ai">OpenRouter</a>. Wire nodes, run pipelines—no glue code.
+</p>
+
+<p align="center">
+  <a href="https://github.com/doomL/OpenRouter-Studio/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg?style=flat-square" alt="Apache 2.0" /></a>
+  <a href="https://nextjs.org/"><img src="https://img.shields.io/badge/Next.js-16-black?style=flat-square&logo=next.js&logoColor=white" alt="Next.js 16" /></a>
+  <a href="https://react.dev/"><img src="https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black" alt="React 19" /></a>
+  <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-5-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript" /></a>
+  <a href="https://www.docker.com/"><img src="https://img.shields.io/badge/Docker-ready-2496ED?style=flat-square&logo=docker&logoColor=white" alt="Docker" /></a>
 </p>
 
 <p align="center">
   <a href="https://github.com/doomL/OpenRouter-Studio">GitHub</a>
-  ·
+  &nbsp;·&nbsp;
   <a href="https://openrouter.ai">OpenRouter</a>
+  &nbsp;·&nbsp;
+  <a href="https://github.com/doomL/OpenRouter-Studio/stargazers"><img src="https://img.shields.io/github/stars/doomL/OpenRouter-Studio?style=flat-square&logo=github&label=stars" alt="GitHub stars" /></a>
 </p>
 
 ---
 
-## Why use it
+## Features
 
 | | |
 |--|--|
 | **Canvas** | Drag nodes from a palette, connect outputs to inputs, run one node or **Run all** in dependency order. |
-| **Models** | Anything OpenRouter exposes—chat, vision-capable models, image generators, video jobs (alpha APIs where applicable). |
+| **Models** | Anything OpenRouter exposes—chat, vision-capable models, image generators, video jobs (including alpha APIs where applicable). |
 | **Your key** | Bring your own OpenRouter API key; usage is billed by OpenRouter. The app proxies requests through your server so the key is not sent straight from the browser to `openrouter.ai`. |
-| **Accounts** | Sign up to sync **encrypted API key** (with `AUTH_SECRET`), **canvas**, **saved workflows**, **theme**, and **video job metadata** in SQLite—pick up where you left off on another device. |
+| **Accounts** | Sign up to sync **encrypted API key** (with `AUTH_SECRET`), **canvas**, **saved workflows**, **theme**, and **video job metadata** in SQLite—resume on another device. |
 | **Self-host** | Run locally or in Docker; export/import workflows as JSON for backups. |
 
 ---
@@ -66,17 +76,16 @@ cp .env.example .env
 
 Minimum in **`.env`**: **`AUTH_SECRET`**, **`NEXTAUTH_URL`** (no trailing slash). **`DATABASE_URL`** defaults to `file:./dev.db` inside the container.
 
-**2. Run**
+**2. Build and run**
 
 ```bash
-docker compose build
-docker compose up -d
+docker compose up --build -d
 ```
 
 **Port in use?** (e.g. dev server on 3000)
 
 ```bash
-APP_PORT=3080 docker compose up -d
+APP_PORT=3080 docker compose up --build -d
 ```
 
 Use **`NEXTAUTH_URL=http://localhost:3080`** (or your real origin) so NextAuth matches the URL in the browser.
@@ -99,7 +108,7 @@ Compose may load **`.env`**; it sets **`AUTH_TRUST_HOST=true`** for port mapping
 
 ---
 
-## How it works (short)
+## How it works
 
 1. After sign-in, the studio loads your saved state from the server; edits debounce and sync automatically.
 2. Add **Prompt**, **LLM**, **Image**, **Video**, input nodes, **Notes**, and **Output**; connect compatible handles.
@@ -112,4 +121,4 @@ For payload details and model notes, see **`openrouter-studio-prompt.md`** and *
 
 ## License
 
-See the license file in the repository (e.g. MIT if specified).
+Licensed under the **Apache License 2.0**. See [`LICENSE`](LICENSE).
