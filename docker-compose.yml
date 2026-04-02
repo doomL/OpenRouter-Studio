@@ -12,7 +12,8 @@ services:
       # Always listen on :3000 inside the container. `ports` maps host APP_PORT → 3000.
       # (`.env` often sets PORT=3080 for local dev; that would break the 3080:3000 mapping.)
       PORT: "3000"
-      # NextAuth behind Docker port mapping / reverse proxy
+      # Use request Host / X-Forwarded-* for Auth.js URL building (sign-out redirect, etc.)
       AUTH_TRUST_HOST: "true"
-      # Must match the URL you open in the browser (host + port)
-      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3080}
+      # Do NOT default NEXTAUTH_URL to localhost here — that forces sign-out (and other redirects)
+      # to localhost on a public host. Omit NEXTAUTH_URL and rely on AUTH_TRUST_HOST, or set
+      # NEXTAUTH_URL in `.env` to your real public origin (https://your.domain).

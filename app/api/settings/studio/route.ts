@@ -4,6 +4,15 @@ import { prisma } from "@/lib/prisma";
 import { decryptApiKey, encryptApiKey } from "@/lib/studio-crypto";
 import type { Prisma } from "@/lib/generated/prisma/client";
 
+/** JWT can outlive the DB (e.g. fresh Docker volume); UserStudioState FK requires a real User row. */
+async function sessionUserExists(userId: string): Promise<boolean> {
+  const u = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true },
+  });
+  return u != null;
+}
+
 function emptyPayload() {
   return {
     apiKey: "",
@@ -22,6 +31,12 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const userId = session.user.id;
+  if (!(await sessionUserExists(userId))) {
+    return NextResponse.json(
+      { error: "Invalid session; sign in again." },
+      { status: 401 }
+    );
+  }
   const row = await prisma.userStudioState.findUnique({ where: { userId } });
   if (!row) {
     return NextResponse.json(emptyPayload());
@@ -51,6 +66,12 @@ export async function PUT(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const userId = session.user.id;
+  if (!(await sessionUserExists(userId))) {
+    return NextResponse.json(
+      { error: "Invalid session; sign in again." },
+      { status: 401 }
+    );
+  }
   let body: unknown;
   try {
     body = await req.json();

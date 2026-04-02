@@ -6,6 +6,7 @@ import Credentials from "next-auth/providers/credentials";
  * Login runs via app/api/auth (lib/auth.ts); this instance only validates sessions.
  */
 export const edgeAuthConfig = {
+  trustHost: true,
   session: { strategy: "jwt" },
   pages: {
     signIn: "/auth/login",
@@ -24,6 +25,9 @@ export const edgeAuthConfig = {
     }),
   ],
   callbacks: {
+    authorized({ auth }) {
+      return !!auth?.user;
+    },
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;

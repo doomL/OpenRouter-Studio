@@ -20,13 +20,18 @@ export async function saveStudioSettingsToServer(
   opts?: { keepalive?: boolean }
 ): Promise<Response> {
   try {
-    return await fetch("/api/settings/studio", {
+    const res = await fetch("/api/settings/studio", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
       body: JSON.stringify(getStudioSettingsPayload(overrides)),
       keepalive: opts?.keepalive,
     });
+    if (res.status === 401 && typeof window !== "undefined") {
+      const { signOutAtCurrentOrigin } = await import("@/lib/studio-sign-out");
+      void signOutAtCurrentOrigin("/auth/login");
+    }
+    return res;
   } catch {
     // Tab hidden, offline, or unload — fetch rejects; never surface as unhandledRejection
     return new Response(null, { status: 503, statusText: "Network Error" });

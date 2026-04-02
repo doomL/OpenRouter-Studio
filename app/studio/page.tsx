@@ -31,7 +31,8 @@ import {
   UserIcon,
   Trash2Icon,
 } from "lucide-react";
-import { useSession, signOut } from "next-auth/react";
+import { useSession } from "next-auth/react";
+import { signOutAtCurrentOrigin } from "@/lib/studio-sign-out";
 import { useStudioStore } from "@/lib/store";
 import { getRunnableNodes, hasUpstreamOutput } from "@/lib/autorun";
 import { useStudioCloudSync } from "@/components/studio/useStudioCloudSync";
@@ -381,7 +382,7 @@ export default function StudioPage() {
                       className="text-xs text-red-400 gap-1.5"
                       onClick={() => {
                         useStudioStore.getState().clearStudioForLogout();
-                        void signOut({ callbackUrl: "/" });
+                        void signOutAtCurrentOrigin("/");
                       }}
                     >
                       <LogOutIcon className="size-3" />

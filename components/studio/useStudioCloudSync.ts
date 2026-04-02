@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
+import { signOutAtCurrentOrigin } from "@/lib/studio-sign-out";
 import { useStudioStore } from "@/lib/store";
 import { saveStudioSettingsToServer } from "@/lib/studio-settings-api";
 
@@ -33,6 +34,10 @@ export function useStudioCloudSync(): boolean {
       try {
         const res = await fetch("/api/settings/studio", { credentials: "include" });
         if (cancelled) return;
+        if (res.status === 401) {
+          void signOutAtCurrentOrigin("/auth/login");
+          return;
+        }
         if (res.ok) {
           const data = await res.json();
           useStudioStore.getState().hydrateFromServer(data);
