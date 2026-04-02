@@ -12,22 +12,38 @@ export async function POST(req: NextRequest) {
 
     // OpenRouter image generation uses /v1/chat/completions with modalities
     // NOT /v1/images/generations (that endpoint doesn't exist)
-    const { model, prompt, image, aspect_ratio, image_size, mode } = body;
+    const {
+      model,
+      prompt,
+      image,
+      images: imagesFromBody,
+      aspect_ratio,
+      image_size,
+      mode,
+    } = body;
+
+    const refUrls: string[] = [];
+    if (Array.isArray(imagesFromBody)) {
+      for (const u of imagesFromBody) {
+        if (typeof u === "string" && u.length > 0) refUrls.push(u);
+      }
+    } else if (typeof image === "string" && image.length > 0) {
+      refUrls.push(image);
+    }
 
     const messages: Array<Record<string, unknown>> = [];
 
-    // Reference image (style / img2img): include alongside text. Default copy matches mode
-    // so "text to image" + ref does not imply "transform" when the prompt is empty.
-    if (image) {
+    // Reference image(s): text first, then each image (OpenRouter multimodal guidance).
+    if (refUrls.length > 0) {
       const defaultWithRef =
         mode === "img2img" ? "Transform this image" : "Generate an image";
-      messages.push({
-        role: "user",
-        content: [
-          { type: "text", text: prompt || defaultWithRef },
-          { type: "image_url", image_url: { url: image } },
-        ],
-      });
+      const content: Array<Record<string, unknown>> = [
+        { type: "text", text: prompt || defaultWithRef },
+      ];
+      for (const url of refUrls) {
+        content.push({ type: "image_url", image_url: { url } });
+      }
+      messages.push({ role: "user", content });
     } else {
       messages.push({
         role: "user",

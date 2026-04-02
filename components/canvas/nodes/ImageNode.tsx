@@ -76,11 +76,14 @@ function ImageNodeComponent({ id, data }: NodeProps) {
 
       const refUrls = imageRefs
         .filter((r) => r.handle.startsWith("image_ref_"))
+        .sort((a, b) => {
+          const na = parseInt(a.handle.replace(/^image_ref_/, ""), 10) || 0;
+          const nb = parseInt(b.handle.replace(/^image_ref_/, ""), 10) || 0;
+          return na - nb;
+        })
         .map((r) => r.url);
-      // Always pass a connected reference to the API. (Previously this only ran in
-      // "Image to Image" mode, so "Text to Image" + ref looked like prompt-only.)
       if (refUrls.length > 0) {
-        body.image = refUrls[0];
+        body.images = refUrls;
       }
 
       const res = await fetch("/api/openrouter/image", {
