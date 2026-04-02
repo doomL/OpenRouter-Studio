@@ -10,6 +10,10 @@ import {
   applyEdgeChanges,
   addEdge,
 } from "@xyflow/react";
+import {
+  mergeDynamicHandleCounts,
+  rebuildDynamicHandleCountsFromEdges,
+} from "@/lib/canvas-handles";
 
 export interface NodeOutput {
   text?: string;
@@ -407,7 +411,7 @@ export const useStudioStore = create<StudioState>()(
             nodes: workflow.nodes,
             edges: workflow.edges,
             nodeOutputs: {},
-            dynamicHandleCounts: {},
+            dynamicHandleCounts: rebuildDynamicHandleCountsFromEdges(workflow.edges),
           });
         }
       },
@@ -434,7 +438,7 @@ export const useStudioStore = create<StudioState>()(
             nodes: data.nodes,
             edges: data.edges,
             nodeOutputs: {},
-            dynamicHandleCounts: {},
+            dynamicHandleCounts: rebuildDynamicHandleCountsFromEdges(data.edges),
           });
           return true;
         } catch {
@@ -510,21 +514,25 @@ export const useStudioStore = create<StudioState>()(
           payload.theme === "light" || payload.theme === "dark"
             ? payload.theme
             : "dark";
+        const nodes = Array.isArray(payload.nodes) ? payload.nodes : [];
+        const edges = Array.isArray(payload.edges) ? payload.edges : [];
+        const fromEdges = rebuildDynamicHandleCountsFromEdges(edges);
+        const fromPayload =
+          payload.dynamicHandleCounts &&
+          typeof payload.dynamicHandleCounts === "object"
+            ? payload.dynamicHandleCounts
+            : {};
         set({
           apiKey: typeof payload.apiKey === "string" ? payload.apiKey : "",
           theme,
-          nodes: Array.isArray(payload.nodes) ? payload.nodes : [],
-          edges: Array.isArray(payload.edges) ? payload.edges : [],
+          nodes,
+          edges,
           workflows: Array.isArray(payload.workflows) ? payload.workflows : [],
           videoJobs:
             payload.videoJobs && typeof payload.videoJobs === "object"
               ? payload.videoJobs
               : {},
-          dynamicHandleCounts:
-            payload.dynamicHandleCounts &&
-            typeof payload.dynamicHandleCounts === "object"
-              ? payload.dynamicHandleCounts
-              : {},
+          dynamicHandleCounts: mergeDynamicHandleCounts(fromEdges, fromPayload),
           nodeOutputs: {},
           history: [],
           historyIndex: -1,

@@ -23,6 +23,7 @@ function ImageNodeComponent({ id, data }: NodeProps) {
   const setNodeOutput = useStudioStore((s) => s.setNodeOutput);
   const nodeOutput = useStudioStore((s) => s.nodeOutputs[id]);
   const edges = useStudioStore((s) => s.edges);
+  const nodes = useStudioStore((s) => s.nodes);
   const nodeOutputs = useStudioStore((s) => s.nodeOutputs);
   const apiKey = useStudioStore((s) => s.apiKey);
   const dynamicCount =
@@ -51,10 +52,10 @@ function ImageNodeComponent({ id, data }: NodeProps) {
       : "border-studio-node-border";
 
   const connectedRefs = useMemo(() => {
-    return getImageRefInputs(id, edges, nodeOutputs).filter((r) =>
+    return getImageRefInputs(id, edges, nodeOutputs, nodes).filter((r) =>
       r.handle.startsWith("image_ref_")
     );
-  }, [id, edges, nodeOutputs]);
+  }, [id, edges, nodeOutputs, nodes]);
 
   const handleCount = Math.max(dynamicCount, connectedRefs.length + 1);
 
@@ -64,7 +65,7 @@ function ImageNodeComponent({ id, data }: NodeProps) {
 
     try {
       const inputs = getNodeInputs(id, edges, nodeOutputs);
-      const imageRefs = getImageRefInputs(id, edges, nodeOutputs);
+      const imageRefs = getImageRefInputs(id, edges, nodeOutputs, nodes);
       const prompt = inputs.prompt || "";
 
       const body: Record<string, unknown> = {
@@ -113,7 +114,18 @@ function ImageNodeComponent({ id, data }: NodeProps) {
       const msg = e instanceof Error ? e.message : "Unknown error";
       setNodeOutput(id, { status: "error", error: msg });
     }
-  }, [id, model, apiKey, edges, nodeOutputs, aspectRatio, mode, setNodeOutput, updateNodeData]);
+  }, [
+    id,
+    model,
+    apiKey,
+    edges,
+    nodes,
+    nodeOutputs,
+    aspectRatio,
+    mode,
+    setNodeOutput,
+    updateNodeData,
+  ]);
 
   return (
     <div

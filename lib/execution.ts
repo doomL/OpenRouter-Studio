@@ -1,4 +1,5 @@
-import { type Edge } from "@xyflow/react";
+import { type Edge, type Node } from "@xyflow/react";
+import { imageUrlFromPersistedNodeData } from "@/lib/canvas-handles";
 import { type NodeOutput } from "./store";
 
 /**
@@ -41,15 +42,18 @@ export function getNodeInputs(
 }
 
 /**
- * Get all image reference inputs for nodes with dynamic handles
+ * Get all image reference inputs for nodes with dynamic handles.
+ * Pass `nodes` so URLs still resolve after import when `nodeOutputs` was cleared but `node.data` has images.
  */
 export function getImageRefInputs(
   nodeId: string,
   edges: Edge[],
-  nodeOutputs: Record<string, NodeOutput>
+  nodeOutputs: Record<string, NodeOutput>,
+  nodes?: Node[]
 ): Array<{ handle: string; url: string }> {
   const refs: Array<{ handle: string; url: string }> = [];
   const incomingEdges = edges.filter((e) => e.target === nodeId);
+  const nodeById = nodes ? new Map(nodes.map((n) => [n.id, n])) : null;
 
   for (const edge of incomingEdges) {
     const targetHandle = edge.targetHandle || "";
@@ -62,11 +66,14 @@ export function getImageRefInputs(
       targetHandle === "image_url"
     ) {
       const sourceOutput = nodeOutputs[edge.source];
-      const url =
+      let url =
         sourceOutput?.image_url ??
         (sourceOutput?.image_base64
           ? `data:image/png;base64,${sourceOutput.image_base64}`
           : undefined);
+      if (!url && nodeById) {
+        url = imageUrlFromPersistedNodeData(nodeById.get(edge.source));
+      }
       if (url) {
         refs.push({ handle: targetHandle, url });
       }

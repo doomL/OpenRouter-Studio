@@ -65,6 +65,7 @@ function VideoNodeComponent({ id, data }: NodeProps) {
   const setNodeOutput = useStudioStore((s) => s.setNodeOutput);
   const nodeOutput = useStudioStore((s) => s.nodeOutputs[id]);
   const edges = useStudioStore((s) => s.edges);
+  const nodes = useStudioStore((s) => s.nodes);
   const nodeOutputs = useStudioStore((s) => s.nodeOutputs);
   const apiKey = useStudioStore((s) => s.apiKey);
   const videoJob = useStudioStore((s) => s.videoJobs[id]);
@@ -109,10 +110,10 @@ function VideoNodeComponent({ id, data }: NodeProps) {
     : "border-studio-node-border";
 
   const connectedCharRefs = useMemo(() => {
-    return getImageRefInputs(id, edges, nodeOutputs).filter((r) =>
+    return getImageRefInputs(id, edges, nodeOutputs, nodes).filter((r) =>
       r.handle.startsWith("character_ref_")
     );
-  }, [id, edges, nodeOutputs]);
+  }, [id, edges, nodeOutputs, nodes]);
 
   const charHandleCount = Math.max(
     dynamicCount,
@@ -174,7 +175,7 @@ function VideoNodeComponent({ id, data }: NodeProps) {
 
     try {
       const inputs = getNodeInputs(id, edges, nodeOutputs);
-      const imageRefs = getImageRefInputs(id, edges, nodeOutputs);
+      const imageRefs = getImageRefInputs(id, edges, nodeOutputs, nodes);
       let videoFrameRefs: Array<{ handle: string; url: string }> = [];
       try {
         videoFrameRefs = await resolveVideoFrameRefsFromEdges(id, edges, nodeOutputs);
@@ -268,7 +269,22 @@ function VideoNodeComponent({ id, data }: NodeProps) {
       const msg = e instanceof Error ? e.message : "Unknown error";
       setNodeOutput(id, { status: "error", error: msg });
     }
-  }, [id, model, apiKey, edges, nodeOutputs, duration, aspectRatio, resolution, generateAudio, seed, params.audio, setNodeOutput, setVideoJob]);
+  }, [
+    id,
+    model,
+    apiKey,
+    edges,
+    nodes,
+    nodeOutputs,
+    duration,
+    aspectRatio,
+    resolution,
+    generateAudio,
+    seed,
+    params.audio,
+    setNodeOutput,
+    setVideoJob,
+  ]);
 
   const formatTime = (s: number) =>
     `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, "0")}`;

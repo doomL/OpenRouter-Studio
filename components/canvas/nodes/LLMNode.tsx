@@ -15,6 +15,7 @@ function LLMNodeComponent({ id, data }: NodeProps) {
   const setNodeOutput = useStudioStore((s) => s.setNodeOutput);
   const nodeOutput = useStudioStore((s) => s.nodeOutputs[id]);
   const edges = useStudioStore((s) => s.edges);
+  const nodes = useStudioStore((s) => s.nodes);
   const nodeOutputs = useStudioStore((s) => s.nodeOutputs);
   const apiKey = useStudioStore((s) => s.apiKey);
 
@@ -48,7 +49,7 @@ function LLMNodeComponent({ id, data }: NodeProps) {
 
     try {
       const inputs = getNodeInputs(id, edges, nodeOutputs);
-      const imageRefs = getImageRefInputs(id, edges, nodeOutputs);
+      const imageRefs = getImageRefInputs(id, edges, nodeOutputs, nodes);
 
       const prompt = inputs.prompt || inputs.text || "";
       const system = inputs.system || "";
@@ -115,7 +116,19 @@ function LLMNodeComponent({ id, data }: NodeProps) {
       const msg = e instanceof Error ? e.message : "Unknown error";
       setNodeOutput(id, { status: "error", error: msg });
     }
-  }, [id, model, apiKey, edges, nodeOutputs, temperature, maxTokens, setNodeOutput]);
+  }, [
+    id,
+    model,
+    apiKey,
+    edges,
+    nodes,
+    nodeOutputs,
+    temperature,
+    maxTokens,
+    setNodeOutput,
+    updateNodeData,
+    addCost,
+  ]);
 
   return (
     <div
