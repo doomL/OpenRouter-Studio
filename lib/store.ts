@@ -46,6 +46,44 @@ interface HistoryEntry {
 
 const MAX_HISTORY = 50;
 
+export const STUDIO_NODE_CLIPBOARD_VERSION = 1;
+
+/** Subgraph copied from the canvas (no wrapper fields). */
+export type StudioNodesFragment = {
+  nodes: Node[];
+  edges: Edge[];
+  dynamicHandleCounts?: Record<
+    string,
+    { image_ref: number; character_ref: number }
+  >;
+};
+
+export function parseStudioNodeClipboard(text: string): StudioNodesFragment | null {
+  try {
+    const o = JSON.parse(text) as Record<string, unknown>;
+    if (
+      o.studioClipboard !== true ||
+      o.version !== STUDIO_NODE_CLIPBOARD_VERSION ||
+      !Array.isArray(o.nodes) ||
+      o.nodes.length === 0
+    ) {
+      return null;
+    }
+    return {
+      nodes: o.nodes as Node[],
+      edges: Array.isArray(o.edges) ? (o.edges as Edge[]) : [],
+      dynamicHandleCounts:
+        o.dynamicHandleCounts &&
+        typeof o.dynamicHandleCounts === "object" &&
+        o.dynamicHandleCounts !== null
+          ? (o.dynamicHandleCounts as StudioNodesFragment["dynamicHandleCounts"])
+          : undefined,
+    };
+  } catch {
+    return null;
+  }
+}
+
 /** Handle type compatibility for connection validation */
 const HANDLE_TYPES: Record<string, string> = {
   // source handles → type
@@ -105,6 +143,10 @@ interface StudioState {
   addNode: (node: Node) => void;
   updateNodeData: (nodeId: string, data: Record<string, unknown>) => void;
   duplicateNode: (nodeId: string) => void;
+  /** Selected nodes + edges between them + handle counts (for copy/paste). */
+  buildSelectedNodesClipboardPayload: () => StudioNodesFragment | null;
+  /** Clone fragment with new ids, offset positions, merge edges & handle counts. */
+  pasteNodesFragment: (fragment: StudioNodesFragment) => void;
 
   // Node outputs
   nodeOutputs: Record<string, NodeOutput>;
@@ -246,6 +288,79 @@ export const useStudioStore = create<StudioState>()(
           data: { ...node.data },
         };
         set({ nodes: [...get().nodes, clone] });
+      },
+      buildSelectedNodesClipboardPayload: () => {
+        const { nodes, edges, dynamicHandleCounts } = get();
+        const selected = nodes.filter((n) => n.selected);
+        if (selected.length === 0) return null;
+        const ids = new Set(selected.map((n) => n.id));
+        const fragmentNodes = JSON.parse(JSON.stringify(selected)) as Node[];
+        const fragmentEdges = JSON.parse(
+          JSON.stringify(
+            edges.filter((e) => ids.has(e.source) && ids.has(e.target))
+          )
+        ) as Edge[];
+        const fragmentCounts: NonNullable<StudioNodesFragment["dynamicHandleCounts"]> =
+          {};
+        for (const id of ids) {
+          const c = dynamicHandleCounts[id];
+          if (c) fragmentCounts[id] = { ...c };
+        }
+        return {
+          nodes: fragmentNodes,
+          edges: fragmentEdges,
+          dynamicHandleCounts:
+            Object.keys(fragmentCounts).length > 0 ? fragmentCounts : undefined,
+        };
+      },
+      pasteNodesFragment: (fragment) => {
+        const { nodes: sourceNodes, edges: sourceEdges, dynamicHandleCounts: srcCounts } =
+          fragment;
+        if (!sourceNodes.length) return;
+        get().pushHistory();
+        const idMap = new Map<string, string>();
+        sourceNodes.forEach((n, i) => {
+          idMap.set(
+            n.id,
+            `${n.type}-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 9)}`
+          );
+        });
+        const OFFSET = 40;
+        const newNodes: Node[] = sourceNodes.map((n) => {
+          const clone = JSON.parse(JSON.stringify(n)) as Node;
+          clone.id = idMap.get(n.id)!;
+          clone.position = {
+            x: n.position.x + OFFSET,
+            y: n.position.y + OFFSET,
+          };
+          clone.selected = true;
+          return clone;
+        });
+        const newEdges: Edge[] = sourceEdges
+          .map((e, i) => {
+            const src = idMap.get(e.source);
+            const tgt = idMap.get(e.target);
+            if (!src || !tgt) return null;
+            const c = JSON.parse(JSON.stringify(e)) as Edge;
+            c.id = `e-${src}-${tgt}-${Date.now()}-${i}`;
+            c.source = src;
+            c.target = tgt;
+            return c;
+          })
+          .filter((e): e is Edge => e !== null);
+        const existingNodes = get().nodes.map((n) => ({ ...n, selected: false }));
+        const newDynamic = { ...get().dynamicHandleCounts };
+        if (srcCounts) {
+          for (const oldId of Object.keys(srcCounts)) {
+            const nid = idMap.get(oldId);
+            if (nid) newDynamic[nid] = { ...srcCounts[oldId] };
+          }
+        }
+        set({
+          nodes: [...existingNodes, ...newNodes],
+          edges: [...get().edges, ...newEdges],
+          dynamicHandleCounts: newDynamic,
+        });
       },
 
       // Node outputs

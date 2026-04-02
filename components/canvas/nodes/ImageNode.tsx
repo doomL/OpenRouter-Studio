@@ -70,13 +70,16 @@ function ImageNodeComponent({ id, data }: NodeProps) {
       const body: Record<string, unknown> = {
         model,
         prompt,
+        mode,
         aspect_ratio: aspectRatio,
       };
 
       const refUrls = imageRefs
         .filter((r) => r.handle.startsWith("image_ref_"))
         .map((r) => r.url);
-      if (refUrls.length > 0 && mode === "img2img") {
+      // Always pass a connected reference to the API. (Previously this only ran in
+      // "Image to Image" mode, so "Text to Image" + ref looked like prompt-only.)
+      if (refUrls.length > 0) {
         body.image = refUrls[0];
       }
 
@@ -107,7 +110,7 @@ function ImageNodeComponent({ id, data }: NodeProps) {
       const msg = e instanceof Error ? e.message : "Unknown error";
       setNodeOutput(id, { status: "error", error: msg });
     }
-  }, [id, model, apiKey, edges, nodeOutputs, aspectRatio, mode, setNodeOutput]);
+  }, [id, model, apiKey, edges, nodeOutputs, aspectRatio, mode, setNodeOutput, updateNodeData]);
 
   return (
     <div
@@ -125,6 +128,9 @@ function ImageNodeComponent({ id, data }: NodeProps) {
 
         <div>
           <Label className="text-xs text-muted-foreground">Mode</Label>
+          <p className="text-[10px] text-muted-foreground/90 leading-tight mb-1">
+            Reference inputs are sent in both modes; use Image→Image when you want edit-style defaults.
+          </p>
           <Select
             value={mode}
             onValueChange={(v) => v && updateNodeData(id, { mode: v })}

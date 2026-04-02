@@ -13,8 +13,21 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
-import { useStudioStore, isValidConnection } from "@/lib/store";
+import {
+  useStudioStore,
+  isValidConnection,
+  parseStudioNodeClipboard,
+  STUDIO_NODE_CLIPBOARD_VERSION,
+} from "@/lib/store";
 import { nodeTypes } from "./nodes";
+
+function isEditableEventTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  const tag = target.tagName;
+  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
+  if (target.isContentEditable) return true;
+  return target.closest("[contenteditable='true']") != null;
+}
 
 export function StudioCanvas() {
   const nodes = useStudioStore((s) => s.nodes);
@@ -24,6 +37,10 @@ export function StudioCanvas() {
   const onConnect = useStudioStore((s) => s.onConnect);
   const addNode = useStudioStore((s) => s.addNode);
   const duplicateNode = useStudioStore((s) => s.duplicateNode);
+  const buildSelectedNodesClipboardPayload = useStudioStore(
+    (s) => s.buildSelectedNodesClipboardPayload
+  );
+  const pasteNodesFragment = useStudioStore((s) => s.pasteNodesFragment);
   const undo = useStudioStore((s) => s.undo);
   const redo = useStudioStore((s) => s.redo);
   const theme = useStudioStore((s) => s.theme);
@@ -31,7 +48,7 @@ export function StudioCanvas() {
 
   const rfInstance = useRef<ReactFlowInstance | null>(null);
 
-  // Keyboard shortcuts: Ctrl+Z, Ctrl+Shift+Z, Ctrl+D
+  // Keyboard shortcuts: undo/redo, duplicate, copy/paste nodes
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const meta = e.ctrlKey || e.metaKey;
@@ -47,11 +64,42 @@ export function StudioCanvas() {
         e.preventDefault();
         const selected = nodes.find((n) => n.selected);
         if (selected) duplicateNode(selected.id);
+      } else if (e.key === "c" || e.key === "C") {
+        if (isEditableEventTarget(e.target)) return;
+        const fragment = buildSelectedNodesClipboardPayload();
+        if (!fragment) return;
+        e.preventDefault();
+        void navigator.clipboard.writeText(
+          JSON.stringify({
+            studioClipboard: true,
+            version: STUDIO_NODE_CLIPBOARD_VERSION,
+            ...fragment,
+          })
+        );
+      } else if (e.key === "v" || e.key === "V") {
+        if (isEditableEventTarget(e.target)) return;
+        e.preventDefault();
+        void (async () => {
+          try {
+            const text = await navigator.clipboard.readText();
+            const fragment = parseStudioNodeClipboard(text);
+            if (fragment) pasteNodesFragment(fragment);
+          } catch {
+            /* clipboard unavailable or denied */
+          }
+        })();
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [undo, redo, duplicateNode, nodes]);
+  }, [
+    undo,
+    redo,
+    duplicateNode,
+    nodes,
+    buildSelectedNodesClipboardPayload,
+    pasteNodesFragment,
+  ]);
 
   const onDrop = useCallback(
     (e: React.DragEvent) => {
@@ -118,6 +166,9 @@ export function StudioCanvas() {
         nodeTypes={nodeTypes}
         isValidConnection={validateConnection}
         fitView
+        fitViewOptions={{ minZoom: 0.08, padding: 0.2 }}
+        minZoom={0.08}
+        maxZoom={4}
         deleteKeyCode={["Backspace", "Delete"]}
         colorMode={isDark ? "dark" : "light"}
         edgesReconnectable

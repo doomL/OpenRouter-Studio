@@ -62,7 +62,11 @@ export function getImageRefInputs(
       targetHandle === "image_url"
     ) {
       const sourceOutput = nodeOutputs[edge.source];
-      const url = sourceOutput?.image_url;
+      const url =
+        sourceOutput?.image_url ??
+        (sourceOutput?.image_base64
+          ? `data:image/png;base64,${sourceOutput.image_base64}`
+          : undefined);
       if (url) {
         refs.push({ handle: targetHandle, url });
       }
