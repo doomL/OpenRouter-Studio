@@ -216,6 +216,7 @@ export interface Model {
   priceLabel?: string;
   context_length?: number;
   architecture?: { modality: string };
+  output_modalities?: string[];
 }
 
 export const useStudioStore = create<StudioState>()(

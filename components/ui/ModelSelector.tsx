@@ -10,9 +10,17 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { useStudioStore } from "@/lib/store";
+import { useStudioStore, type Model } from "@/lib/store";
 import { formatPrice } from "@/lib/models";
 import { getCanvasSelectContentProps } from "@/lib/canvas-floating-props";
+import { readJsonResponse } from "@/lib/read-json-response";
+
+type ModelsApiPayload = {
+  error?: unknown;
+  text?: Model[];
+  image?: Model[];
+  video?: Model[];
+};
 
 interface ModelSelectorProps {
   category: "text" | "image" | "video";
@@ -33,9 +41,15 @@ export function ModelSelector({ category, value, onChange }: ModelSelectorProps)
     fetch("/api/openrouter/models", {
       headers: { "x-api-key": apiKey },
     })
-      .then((r) => r.json())
+      .then(async (r) => readJsonResponse<ModelsApiPayload>(r))
       .then((data) => {
-        if (!data.error) setModels(data);
+        if (!data.error) {
+          setModels({
+            text: data.text ?? [],
+            image: data.image ?? [],
+            video: data.video ?? [],
+          });
+        }
       })
       .catch(() => {});
   }, [apiKey, models, setModels]);

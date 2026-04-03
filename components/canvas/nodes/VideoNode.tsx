@@ -16,6 +16,7 @@ import {
 import { useStudioStore } from "@/lib/store";
 import { getNodeInputs, getImageRefInputs } from "@/lib/execution";
 import { resolveVideoFrameRefsFromEdges } from "@/lib/video-frame";
+import { readJsonResponse } from "@/lib/read-json-response";
 import { ModelSelector } from "@/components/ui/ModelSelector";
 import { ZapIcon, AlertTriangleIcon, ClockIcon, Volume2Icon, VolumeXIcon } from "lucide-react";
 import { HandleLabel } from "@/components/canvas/HandleLabel";
@@ -134,7 +135,11 @@ function VideoNodeComponent({ id, data }: NodeProps) {
           `/api/openrouter/video?jobId=${videoJob.jobId}`,
           { headers: { "x-api-key": apiKey } }
         );
-        const result = await res.json();
+        const result = await readJsonResponse<{
+          status?: string;
+          error?: string;
+          usage?: { cost?: number };
+        }>(res);
 
         if (result.status === "completed") {
           const proxyUrl = `/api/openrouter/video/download?jobId=${videoJob.jobId}&index=0&key=${encodeURIComponent(apiKey)}`;
@@ -251,8 +256,16 @@ function VideoNodeComponent({ id, data }: NodeProps) {
         body: JSON.stringify(body),
       });
 
-      const result = await res.json();
-      if (result.error) throw new Error(result.error.message || result.error);
+      const result = await readJsonResponse<{
+        error?: { message?: string } | string;
+        id?: string;
+      }>(res);
+      if (result.error)
+        throw new Error(
+          typeof result.error === "object" && result.error?.message
+            ? result.error.message
+            : String(result.error)
+        );
 
       const jobId = result.id;
       if (!jobId) throw new Error("No job ID in response");

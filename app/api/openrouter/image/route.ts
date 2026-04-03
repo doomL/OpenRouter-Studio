@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fetchFromOpenRouter } from "@/lib/openrouter";
+import { extractGeneratedImageUrl } from "@/lib/openrouter-image-response";
+
+/** Platforms that honor this (e.g. Vercel) won’t kill the function mid-generation. */
+export const maxDuration = 300;
 
 export async function POST(req: NextRequest) {
   const apiKey = req.headers.get("x-api-key");
@@ -20,6 +24,7 @@ export async function POST(req: NextRequest) {
       aspect_ratio,
       image_size,
       mode,
+      modalities: modalitiesFromBody,
     } = body;
 
     const refUrls: string[] = [];
@@ -51,10 +56,18 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    let modalities: string[] = ["image", "text"];
+    if (Array.isArray(modalitiesFromBody)) {
+      const m = modalitiesFromBody.filter((x): x is string => typeof x === "string");
+      if (m.length > 0 && m.every((x) => x === "image" || x === "text")) {
+        modalities = m;
+      }
+    }
+
     const payload: Record<string, unknown> = {
       model,
       messages,
-      modalities: ["image", "text"],
+      modalities,
     };
 
     // Add image_config if aspect ratio or size specified
@@ -69,22 +82,56 @@ export async function POST(req: NextRequest) {
       method: "POST",
       body: JSON.stringify(payload),
     });
-    const data = await res.json();
+    const data = (await res.json()) as Record<string, unknown>;
 
-    // Extract image from the chat completions response format
-    // Response: { choices: [{ message: { images: [{ image_url: { url: "data:..." } }] } }] }
-    const message = data.choices?.[0]?.message;
-    const images = message?.images;
-
-    if (images && images.length > 0) {
-      const imageUrl = images[0].image_url?.url;
-      return NextResponse.json({
-        data: [{ url: imageUrl }],
-      });
+    const topError = data.error;
+    if (topError && typeof topError === "object") {
+      const msg = (topError as Record<string, unknown>).message;
+      return NextResponse.json(
+        {
+          error: {
+            message:
+              typeof msg === "string"
+                ? msg
+                : "OpenRouter returned an error without a message",
+          },
+        },
+        { status: 502 }
+      );
     }
 
-    // Fallback: return raw response for debugging
-    return NextResponse.json(data);
+    const choice = (data.choices as unknown[] | undefined)?.[0] as
+      | Record<string, unknown>
+      | undefined;
+    const message = choice?.message;
+    const imageUrl = extractGeneratedImageUrl(message);
+
+    if (imageUrl) {
+      return NextResponse.json({ data: [{ url: imageUrl }] });
+    }
+
+    const textHint =
+      message && typeof message === "object"
+        ? (() => {
+            const c = (message as Record<string, unknown>).content;
+            if (typeof c === "string" && c.trim()) return c.slice(0, 400);
+            return undefined;
+          })()
+        : undefined;
+    const finish = choice?.finish_reason;
+
+    return NextResponse.json(
+      {
+        error: {
+          message:
+            "The model returned no image. Try another image model, adjust the prompt, or check that the model supports image output with the current modalities.",
+          hint: textHint,
+          finish_reason: finish,
+          model,
+        },
+      },
+      { status: 502 }
+    );
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Unknown error";
     return NextResponse.json({ error: msg }, { status: 500 });

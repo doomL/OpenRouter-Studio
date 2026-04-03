@@ -3,8 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
 import { signOutAtCurrentOrigin } from "@/lib/studio-sign-out";
-import { useStudioStore } from "@/lib/store";
+import { useStudioStore, type StudioServerSnapshot } from "@/lib/store";
 import { saveStudioSettingsToServer } from "@/lib/studio-settings-api";
+import { readJsonResponse } from "@/lib/read-json-response";
 
 const DEBOUNCE_MS = 600;
 
@@ -39,7 +40,7 @@ export function useStudioCloudSync(): boolean {
           return;
         }
         if (res.ok) {
-          const data = await res.json();
+          const data = await readJsonResponse<StudioServerSnapshot>(res);
           useStudioStore.getState().hydrateFromServer(data);
         }
       } catch {

@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { useStudioStore } from "@/lib/store";
 import { getNodeInputs, getImageRefInputs } from "@/lib/execution";
+import { readJsonResponse } from "@/lib/read-json-response";
 import { ModelSelector } from "@/components/ui/ModelSelector";
 import { HandleLabel } from "@/components/canvas/HandleLabel";
 
@@ -91,8 +92,19 @@ function LLMNodeComponent({ id, data }: NodeProps) {
         }),
       });
 
-      const result = await res.json();
-      if (result.error) throw new Error(result.error.message || result.error);
+      const result = await readJsonResponse<{
+        error?: { message?: string };
+        choices?: Array<{ message?: { content?: string } }>;
+        usage?: { prompt_tokens?: number; completion_tokens?: number };
+      }>(res);
+      if (result.error) {
+        const err = result.error;
+        throw new Error(
+          typeof err === "object" && err !== null && "message" in err
+            ? String((err as { message?: string }).message)
+            : String(err)
+        );
+      }
 
       const text =
         result.choices?.[0]?.message?.content || "No response";

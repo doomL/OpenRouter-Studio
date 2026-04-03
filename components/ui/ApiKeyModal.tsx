@@ -11,9 +11,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useStudioStore } from "@/lib/store";
+import { useStudioStore, type Model } from "@/lib/store";
 import { saveStudioSettingsToServer } from "@/lib/studio-settings-api";
 import { toast } from "@/lib/toast";
+import { readJsonResponse } from "@/lib/read-json-response";
 
 interface ApiKeyModalProps {
   open: boolean;
@@ -41,13 +42,22 @@ export function ApiKeyModal({ open, onOpenChange }: ApiKeyModalProps) {
       const res = await fetch("/api/openrouter/models", {
         headers: { "x-api-key": key },
       });
-      const data = await res.json();
+      const data = await readJsonResponse<{
+        error?: unknown;
+        text?: Model[];
+        image?: Model[];
+        video?: Model[];
+      }>(res);
       if (data.error) {
         setStatus("error");
         toast.error("Connection failed");
       } else {
         setStatus("ok");
-        setModels(data);
+        setModels({
+          text: data.text ?? [],
+          image: data.image ?? [],
+          video: data.video ?? [],
+        });
         toast.success("Connection OK — models loaded");
       }
     } catch {

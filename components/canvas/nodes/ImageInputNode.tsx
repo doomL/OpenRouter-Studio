@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useStudioStore } from "@/lib/store";
 import { HandleLabel } from "@/components/canvas/HandleLabel";
+import { readJsonResponse } from "@/lib/read-json-response";
 
 function ImageInputNodeComponent({ id, data }: NodeProps) {
   const updateNodeData = useStudioStore((s) => s.updateNodeData);
@@ -76,7 +77,16 @@ function ImageInputNodeComponent({ id, data }: NodeProps) {
         headers: { "Content-Type": "application/json", "x-api-key": apiKey },
         body: JSON.stringify({ url: urlInput }),
       });
-      const { base64, mimeType } = await res.json();
+      const body = await readJsonResponse<{
+        base64?: string;
+        mimeType?: string;
+        error?: string;
+      }>(res);
+      if (!res.ok || body.error || !body.base64 || !body.mimeType) {
+        alert(body.error || `Failed to fetch image (${res.status})`);
+        return;
+      }
+      const { base64, mimeType } = body;
       const dataUrl = `data:${mimeType};base64,${base64}`;
       updateNodeData(id, { imageUrl: dataUrl, imagePreview: dataUrl });
       setNodeOutput(id, {

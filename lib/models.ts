@@ -10,6 +10,21 @@ export interface OpenRouterModel {
   /** Human-readable price label extracted from pricing_json for image/video models */
   priceLabel?: string;
   context_length?: number;
+  /** From OpenRouter `output_modalities` — used to pick correct image generation `modalities` */
+  output_modalities?: string[];
+}
+
+/**
+ * OpenRouter expects `["image","text"]` for models like Gemini that emit both, and `["image"]`
+ * for image-only models (e.g. some Flux routes). Wrong modalities often yield text-only responses.
+ */
+export function modalitiesForImageRequest(outputModalities: string[] | undefined): string[] {
+  if (!outputModalities?.length) return ["image", "text"];
+  const hasImage = outputModalities.includes("image");
+  const hasText = outputModalities.includes("text");
+  if (hasImage && hasText) return ["image", "text"];
+  if (hasImage) return ["image"];
+  return ["image", "text"];
 }
 
 /**
@@ -114,6 +129,7 @@ export function categorizeModels(models: Record<string, unknown>[]) {
       pricing,
       priceLabel,
       context_length: contextLength,
+      output_modalities: outputMods.length ? [...outputMods] : undefined,
     };
 
     if (outputMods.includes("text")) {

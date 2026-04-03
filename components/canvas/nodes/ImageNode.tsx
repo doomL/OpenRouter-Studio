@@ -17,6 +17,8 @@ import { getNodeInputs, getImageRefInputs } from "@/lib/execution";
 import { ModelSelector } from "@/components/ui/ModelSelector";
 import { HandleLabel } from "@/components/canvas/HandleLabel";
 import { getCanvasSelectContentProps } from "@/lib/canvas-floating-props";
+import { modalitiesForImageRequest } from "@/lib/models";
+import { readJsonResponse } from "@/lib/read-json-response";
 
 function ImageNodeComponent({ id, data }: NodeProps) {
   const updateNodeData = useStudioStore((s) => s.updateNodeData);
@@ -26,6 +28,7 @@ function ImageNodeComponent({ id, data }: NodeProps) {
   const nodes = useStudioStore((s) => s.nodes);
   const nodeOutputs = useStudioStore((s) => s.nodeOutputs);
   const apiKey = useStudioStore((s) => s.apiKey);
+  const models = useStudioStore((s) => s.models);
   const dynamicCount =
     useStudioStore((s) => s.dynamicHandleCounts[id]?.image_ref) || 1;
 
@@ -68,11 +71,13 @@ function ImageNodeComponent({ id, data }: NodeProps) {
       const imageRefs = getImageRefInputs(id, edges, nodeOutputs, nodes);
       const prompt = inputs.prompt || "";
 
+      const imageMeta = models?.image?.find((m) => m.id === model);
       const body: Record<string, unknown> = {
         model,
         prompt,
         mode,
         aspect_ratio: aspectRatio,
+        modalities: modalitiesForImageRequest(imageMeta?.output_modalities),
       };
 
       const refUrls = imageRefs
@@ -96,8 +101,23 @@ function ImageNodeComponent({ id, data }: NodeProps) {
         body: JSON.stringify(body),
       });
 
-      const result = await res.json();
-      if (result.error) throw new Error(result.error.message || JSON.stringify(result.error));
+      const result = await readJsonResponse<{
+        error?: { message?: string };
+        data?: Array<{ url?: string }>;
+      }>(res);
+      if (result.error) {
+        const err = result.error as { message?: string; hint?: string };
+        let msg =
+          typeof err === "string"
+            ? err
+            : typeof err?.message === "string"
+              ? err.message
+              : JSON.stringify(err);
+        if (typeof err?.hint === "string" && err.hint.trim()) {
+          msg += `\n\n${err.hint.trim()}`;
+        }
+        throw new Error(msg);
+      }
 
       const imageUrl = result.data?.[0]?.url;
       if (!imageUrl) throw new Error("No image in response");
@@ -118,6 +138,7 @@ function ImageNodeComponent({ id, data }: NodeProps) {
     id,
     model,
     apiKey,
+    models,
     edges,
     nodes,
     nodeOutputs,
