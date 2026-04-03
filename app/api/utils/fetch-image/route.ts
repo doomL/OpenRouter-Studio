@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { fetchWithRetry, STUDIO_FETCH_MAX_ATTEMPTS } from "@/lib/fetch-with-retry";
 
 export async function POST(req: NextRequest) {
   try {
@@ -7,7 +8,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "url required" }, { status: 400 });
     }
 
-    const res = await fetch(url);
+    const res = await fetchWithRetry(url, undefined, {
+      maxAttempts: STUDIO_FETCH_MAX_ATTEMPTS,
+    });
     if (!res.ok) {
       return NextResponse.json(
         { error: `Failed to fetch image: ${res.status}` },

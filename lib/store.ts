@@ -177,6 +177,12 @@ interface StudioState {
   theme: "dark" | "light";
   toggleTheme: () => void;
 
+  /** When true, new positions snap to the canvas background grid while dragging. */
+  snapToGrid: boolean;
+  toggleSnapToGrid: () => void;
+  /** Round every node position to the grid (one-shot layout). */
+  snapAllNodesToGrid: () => void;
+
   // Undo / Redo
   history: HistoryEntry[];
   historyIndex: number;
@@ -452,6 +458,24 @@ export const useStudioStore = create<StudioState>()(
       toggleTheme: () =>
         set({ theme: get().theme === "dark" ? "light" : "dark" }),
 
+      snapToGrid: false,
+      toggleSnapToGrid: () => set({ snapToGrid: !get().snapToGrid }),
+      snapAllNodesToGrid: () => {
+        const GRID = 16;
+        const { nodes } = get();
+        if (nodes.length === 0) return;
+        get().pushHistory();
+        set({
+          nodes: nodes.map((n) => ({
+            ...n,
+            position: {
+              x: Math.round(n.position.x / GRID) * GRID,
+              y: Math.round(n.position.y / GRID) * GRID,
+            },
+          })),
+        });
+      },
+
       // Undo / Redo
       history: [],
       historyIndex: -1,
@@ -561,6 +585,7 @@ export const useStudioStore = create<StudioState>()(
       name: "openrouter-studio-v2",
       partialize: (state) => ({
         theme: state.theme,
+        snapToGrid: state.snapToGrid,
       }),
     }
   )

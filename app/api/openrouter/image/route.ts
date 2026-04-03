@@ -82,27 +82,60 @@ export async function POST(req: NextRequest) {
       method: "POST",
       body: JSON.stringify(payload),
     });
-    const data = (await res.json()) as Record<string, unknown>;
-
-    const topError = data.error;
-    if (topError && typeof topError === "object") {
-      const msg = (topError as Record<string, unknown>).message;
+    const raw = await res.text();
+    let data: Record<string, unknown>;
+    try {
+      data = JSON.parse(raw) as Record<string, unknown>;
+    } catch {
       return NextResponse.json(
         {
           error: {
-            message:
-              typeof msg === "string"
-                ? msg
-                : "OpenRouter returned an error without a message",
+            message: `OpenRouter returned non-JSON (proxy or gateway issue?). First bytes: ${raw.slice(0, 180).replace(/\s+/g, " ")}`,
           },
         },
         { status: 502 }
       );
     }
 
-    const choice = (data.choices as unknown[] | undefined)?.[0] as
-      | Record<string, unknown>
-      | undefined;
+    const topError = data.error;
+    if (topError != null) {
+      if (typeof topError === "string") {
+        return NextResponse.json(
+          { error: { message: topError } },
+          { status: 502 }
+        );
+      }
+      if (typeof topError === "object") {
+        const msg = (topError as Record<string, unknown>).message;
+        return NextResponse.json(
+          {
+            error: {
+              message:
+                typeof msg === "string"
+                  ? msg
+                  : "OpenRouter returned an error without a message",
+            },
+          },
+          { status: 502 }
+        );
+      }
+    }
+
+    const choices = data.choices as unknown[] | undefined;
+    if (!Array.isArray(choices) || choices.length === 0) {
+      return NextResponse.json(
+        {
+          error: {
+            message:
+              "OpenRouter returned no choices. The model may have refused the request, or the upstream response was truncated (check proxy timeouts if this happens quickly).",
+            model,
+          },
+        },
+        { status: 502 }
+      );
+    }
+
+    const choice = choices[0] as Record<string, unknown> | undefined;
     const message = choice?.message;
     const imageUrl = extractGeneratedImageUrl(message);
 

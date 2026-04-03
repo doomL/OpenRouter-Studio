@@ -8,12 +8,20 @@ services:
     env_file:
       - path: .env
         required: false
+    volumes:
+      # SQLite and other app data survive image rebuilds and container recreation.
+      - studio-data:/app/data
     environment:
       # Always listen on :3000 inside the container. `ports` maps host APP_PORT → 3000.
       # (`.env` often sets PORT=3080 for local dev; that would break the 3080:3000 mapping.)
       PORT: "3000"
       # Use request Host / X-Forwarded-* for Auth.js URL building (sign-out redirect, etc.)
       AUTH_TRUST_HOST: "true"
+      # Persist DB on the named volume (overrides `DATABASE_URL` from `.env` if set to ./dev.db).
+      DATABASE_URL: "file:/app/data/studio.db"
       # Do NOT default NEXTAUTH_URL to localhost here — that forces sign-out (and other redirects)
       # to localhost on a public host. Omit NEXTAUTH_URL and rely on AUTH_TRUST_HOST, or set
       # NEXTAUTH_URL in `.env` to your real public origin (https://your.domain).
+
+volumes:
+  studio-data:

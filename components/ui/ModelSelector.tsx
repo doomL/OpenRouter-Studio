@@ -14,6 +14,7 @@ import { useStudioStore, type Model } from "@/lib/store";
 import { formatPrice } from "@/lib/models";
 import { getCanvasSelectContentProps } from "@/lib/canvas-floating-props";
 import { readJsonResponse } from "@/lib/read-json-response";
+import { fetchWithRetry, STUDIO_FETCH_MAX_ATTEMPTS } from "@/lib/fetch-with-retry";
 
 type ModelsApiPayload = {
   error?: unknown;
@@ -38,9 +39,11 @@ export function ModelSelector({ category, value, onChange }: ModelSelectorProps)
 
   useEffect(() => {
     if (models || !apiKey) return;
-    fetch("/api/openrouter/models", {
-      headers: { "x-api-key": apiKey },
-    })
+    fetchWithRetry(
+      "/api/openrouter/models",
+      { headers: { "x-api-key": apiKey } },
+      { maxAttempts: STUDIO_FETCH_MAX_ATTEMPTS }
+    )
       .then(async (r) => readJsonResponse<ModelsApiPayload>(r))
       .then((data) => {
         if (!data.error) {

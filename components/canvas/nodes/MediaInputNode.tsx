@@ -9,6 +9,7 @@ import { UploadIcon } from "lucide-react";
 import { useStudioStore } from "@/lib/store";
 import { HandleLabel } from "@/components/canvas/HandleLabel";
 import { readJsonResponse } from "@/lib/read-json-response";
+import { fetchWithRetry, STUDIO_FETCH_MAX_ATTEMPTS } from "@/lib/fetch-with-retry";
 
 type MediaType = "none" | "image" | "video";
 
@@ -116,11 +117,15 @@ function MediaInputNodeComponent({ id, data }: NodeProps) {
     if (!urlInput || mediaType !== "image") return;
     setLoading(true);
     try {
-      const res = await fetch("/api/utils/fetch-image", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-api-key": apiKey },
-        body: JSON.stringify({ url: urlInput }),
-      });
+      const res = await fetchWithRetry(
+        "/api/utils/fetch-image",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-api-key": apiKey },
+          body: JSON.stringify({ url: urlInput }),
+        },
+        { maxAttempts: STUDIO_FETCH_MAX_ATTEMPTS }
+      );
       const body = await readJsonResponse<{
         base64?: string;
         mimeType?: string;

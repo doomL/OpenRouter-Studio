@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { categorizeModels } from "@/lib/models";
+import { fetchWithRetry, STUDIO_FETCH_MAX_ATTEMPTS } from "@/lib/fetch-with-retry";
 
 export async function GET(req: NextRequest) {
   const apiKey = req.headers.get("x-api-key");
@@ -8,13 +9,17 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const res = await fetch("https://openrouter.ai/api/frontend/models", {
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "HTTP-Referer": "https://openrouter-studio.local",
-        "X-Title": "OpenRouter Studio",
+    const res = await fetchWithRetry(
+      "https://openrouter.ai/api/frontend/models",
+      {
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "HTTP-Referer": "https://openrouter-studio.local",
+          "X-Title": "OpenRouter Studio",
+        },
       },
-    });
+      { maxAttempts: STUDIO_FETCH_MAX_ATTEMPTS }
+    );
 
     if (!res.ok) {
       const error = await res.text();

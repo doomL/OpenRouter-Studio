@@ -17,6 +17,7 @@ export function extractGeneratedImageUrl(message: unknown): string | undefined {
     for (const item of images) {
       if (!item || typeof item !== "object") continue;
       const o = item as Record<string, unknown>;
+      if (typeof o.url === "string" && o.url.length > 0) return o.url;
       const u = urlFromPack(o.image_url ?? o.imageUrl);
       if (u) return u;
     }
@@ -31,11 +32,20 @@ export function extractGeneratedImageUrl(message: unknown): string | undefined {
     for (const part of content) {
       if (!part || typeof part !== "object") continue;
       const p = part as Record<string, unknown>;
-      if (p.type === "image_url") {
-        const u = urlFromPack(p.image_url ?? p.imageUrl);
+      if (p.type === "image_url" || p.type === "image") {
+        const u =
+          urlFromPack(p.image_url ?? p.imageUrl) ??
+          (typeof p.url === "string" && p.url.length > 0 ? p.url : undefined);
         if (u) return u;
       }
     }
+  }
+
+  if (typeof content === "string") {
+    const s = content.trim();
+    // Some providers return a lone data URL or URL string as message.content
+    if (s.startsWith("data:image/")) return s;
+    if (/^https?:\/\/.+\.(png|jpe?g|gif|webp)(\?|$)/i.test(s)) return s;
   }
 
   return undefined;

@@ -8,6 +8,7 @@ import { Slider } from "@/components/ui/slider";
 import { useStudioStore } from "@/lib/store";
 import { getNodeInputs, getImageRefInputs } from "@/lib/execution";
 import { readJsonResponse } from "@/lib/read-json-response";
+import { fetchWithRetry, STUDIO_FETCH_MAX_ATTEMPTS } from "@/lib/fetch-with-retry";
 import { ModelSelector } from "@/components/ui/ModelSelector";
 import { HandleLabel } from "@/components/canvas/HandleLabel";
 
@@ -78,19 +79,23 @@ function LLMNodeComponent({ id, data }: NodeProps) {
         messages.push({ role: "user", content: prompt });
       }
 
-      const res = await fetch("/api/openrouter/chat", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": apiKey,
+      const res = await fetchWithRetry(
+        "/api/openrouter/chat",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": apiKey,
+          },
+          body: JSON.stringify({
+            model,
+            messages,
+            temperature,
+            max_tokens: maxTokens,
+          }),
         },
-        body: JSON.stringify({
-          model,
-          messages,
-          temperature,
-          max_tokens: maxTokens,
-        }),
-      });
+        { maxAttempts: STUDIO_FETCH_MAX_ATTEMPTS }
+      );
 
       const result = await readJsonResponse<{
         error?: { message?: string };

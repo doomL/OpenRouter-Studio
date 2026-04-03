@@ -26,9 +26,12 @@ USER root
 RUN npm install prisma@7.5.0 --prefix /app --no-save
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+# su-exec: drop root → nextjs after fixing permissions on Docker volume mounts
+RUN apk add --no-cache su-exec
 # Standalone trace can copy the repo under /app; SQLite + Prisma need a writable tree
 RUN chown -R nextjs:nodejs /app
-USER nextjs
+# Entrypoint starts as root, chowns /app/data, then re-execs as nextjs
+USER root
 EXPOSE 3000
 ENV PORT=3000
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]

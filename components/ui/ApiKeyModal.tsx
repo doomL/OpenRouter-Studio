@@ -15,6 +15,7 @@ import { useStudioStore, type Model } from "@/lib/store";
 import { saveStudioSettingsToServer } from "@/lib/studio-settings-api";
 import { toast } from "@/lib/toast";
 import { readJsonResponse } from "@/lib/read-json-response";
+import { fetchWithRetry, STUDIO_FETCH_MAX_ATTEMPTS } from "@/lib/fetch-with-retry";
 
 interface ApiKeyModalProps {
   open: boolean;
@@ -39,9 +40,11 @@ export function ApiKeyModal({ open, onOpenChange }: ApiKeyModalProps) {
     setTesting(true);
     setStatus("idle");
     try {
-      const res = await fetch("/api/openrouter/models", {
-        headers: { "x-api-key": key },
-      });
+      const res = await fetchWithRetry(
+        "/api/openrouter/models",
+        { headers: { "x-api-key": key } },
+        { maxAttempts: STUDIO_FETCH_MAX_ATTEMPTS }
+      );
       const data = await readJsonResponse<{
         error?: unknown;
         text?: Model[];

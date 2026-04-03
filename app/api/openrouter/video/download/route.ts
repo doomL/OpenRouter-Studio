@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { fetchWithRetry, STUDIO_FETCH_MAX_ATTEMPTS } from "@/lib/fetch-with-retry";
 
 export async function GET(req: NextRequest) {
   // Accept API key from header or query param (needed for <video src="..."> tags)
@@ -17,9 +18,11 @@ export async function GET(req: NextRequest) {
 
   try {
     const url = `https://openrouter.ai/api/alpha/videos/${encodeURIComponent(jobId)}/content?index=${index}`;
-    const res = await fetch(url, {
-      headers: { Authorization: `Bearer ${apiKey}` },
-    });
+    const res = await fetchWithRetry(
+      url,
+      { headers: { Authorization: `Bearer ${apiKey}` } },
+      { maxAttempts: STUDIO_FETCH_MAX_ATTEMPTS }
+    );
 
     if (!res.ok) {
       const err = await res.text();

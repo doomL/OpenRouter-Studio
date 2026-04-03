@@ -25,6 +25,7 @@ import {
   Redo2Icon,
   PlayIcon,
   DownloadIcon,
+  FolderArchiveIcon,
   UploadIcon,
   DollarSignIcon,
   LogOutIcon,
@@ -41,6 +42,7 @@ import { getCanvasViewportFloatingProps } from "@/lib/canvas-floating-props";
 import { formatWorkflowSavedAt } from "@/lib/utils";
 import { ThemedLogo } from "@/components/theme/ThemedLogo";
 import { toast } from "@/lib/toast";
+import { buildStudioMediaZip } from "@/lib/studio-media-zip";
 
 export default function StudioPage() {
   const cloudSyncReady = useStudioCloudSync();
@@ -71,6 +73,7 @@ export default function StudioPage() {
   } | null>(null);
   const [mounted, setMounted] = useState(false);
   const [isRunningAll, setIsRunningAll] = useState(false);
+  const [isDownloadingMediaZip, setIsDownloadingMediaZip] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -120,6 +123,35 @@ export default function StudioPage() {
   const handleImport = useCallback(() => {
     fileInputRef.current?.click();
   }, []);
+
+  const handleDownloadAllMedia = useCallback(async () => {
+    if (isDownloadingMediaZip) return;
+    setIsDownloadingMediaZip(true);
+    const key = useStudioStore.getState().apiKey ?? "";
+    const t = toast.loading("Building media archive…");
+    try {
+      const { blob, fileCount } = await buildStudioMediaZip(
+        useStudioStore.getState().nodes,
+        useStudioStore.getState().edges,
+        useStudioStore.getState().nodeOutputs,
+        useStudioStore.getState().videoJobs,
+        key
+      );
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `studio-media-${new Date().toISOString().slice(0, 10)}.zip`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.dismiss(t);
+      toast.success(`Downloaded ZIP with ${fileCount} file${fileCount === 1 ? "" : "s"}`);
+    } catch (e) {
+      toast.dismiss(t);
+      toast.error(e instanceof Error ? e.message : "Could not build media ZIP");
+    } finally {
+      setIsDownloadingMediaZip(false);
+    }
+  }, [isDownloadingMediaZip]);
 
   const handleFileImport = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -352,6 +384,16 @@ export default function StudioPage() {
             </Button>
             <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={handleImport} title="Import workflow from JSON">
               <UploadIcon className="size-3.5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 w-7 p-0"
+              onClick={() => void handleDownloadAllMedia()}
+              disabled={isDownloadingMediaZip}
+              title="Download all images and videos as ZIP"
+            >
+              <FolderArchiveIcon className="size-3.5" />
             </Button>
             <input
               ref={fileInputRef}

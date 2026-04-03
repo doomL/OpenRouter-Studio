@@ -10,7 +10,12 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/doomL/OpenRouter-Studio/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg?style=flat-square" alt="Apache 2.0" /></a>
+  <em>Independent project — not affiliated with OpenRouter unless agreed in writing. See <a href="#license--intellectual-property">License &amp; IP</a>.</em>
+</p>
+
+<p align="center">
+  <a href="https://github.com/doomL/OpenRouter-Studio/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg?style=flat-square" alt="Apache License 2.0" /></a>
+  <a href="https://github.com/doomL/OpenRouter-Studio/blob/main/NOTICE"><img src="https://img.shields.io/badge/NOTICE-trademark%20%26%20IP-informational?style=flat-square" alt="NOTICE" /></a>
   <a href="https://nextjs.org/"><img src="https://img.shields.io/badge/Next.js-16-black?style=flat-square&logo=next.js&logoColor=white" alt="Next.js 16" /></a>
   <a href="https://react.dev/"><img src="https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black" alt="React 19" /></a>
   <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-5-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript" /></a>
@@ -74,7 +79,7 @@ Images use **Next.js standalone**. Each container start runs **`prisma migrate d
 cp .env.example .env
 ```
 
-Minimum in **`.env`**: **`AUTH_SECRET`**, **`NEXTAUTH_URL`** (no trailing slash). **`DATABASE_URL`** defaults to `file:./dev.db` inside the container.
+Minimum in **`.env`**: **`AUTH_SECRET`**, and usually **`NEXTAUTH_URL`** only when you need a fixed canonical URL. Compose sets **`DATABASE_URL=file:/app/data/studio.db`** and mounts a **named volume** on `/app/data`, so the SQLite database and accounts **persist across image rebuilds** and container recreation. To wipe data, run **`docker compose down -v`**.
 
 **2. Build and run**
 
@@ -90,7 +95,7 @@ APP_PORT=3000 NEXTAUTH_URL=http://localhost:3000 docker compose up --build -d
 
 Or edit `.env` before `docker compose up`. NextAuth must use the same origin you open in the browser.
 
-Compose may load **`.env`**; it sets **`AUTH_TRUST_HOST=true`** for port mapping and reverse proxies. Persist SQLite with a **volume** on `/app/dev.db` (or similar) if you need data to survive container removal.
+Compose may load **`.env`**; it sets **`AUTH_TRUST_HOST=true`** for port mapping and reverse proxies.
 
 **nginx on the same host:** The app listens on **`127.0.0.1:${APP_PORT:-3080}`** on the host (mapped to port **3000** inside the container). Point your `server` / `location` at that upstream, for example `proxy_pass http://127.0.0.1:3080;`. Set **`NEXTAUTH_URL`** to your public `https://your.domain` (no trailing slash). The hostname in container logs (e.g. `f5030adb7722`) is only valid *inside* Docker—not the URL you use in nginx or a browser.
 
@@ -121,6 +126,16 @@ For payload details and model notes, see **`openrouter-studio-prompt.md`** and *
 
 ---
 
-## License
+## License & intellectual property
 
-Licensed under the **Apache License 2.0**. See [`LICENSE`](LICENSE).
+This repository is licensed under the **[Apache License 2.0](LICENSE)**. You may use, modify, and distribute the software for commercial and non-commercial purposes, subject to the terms of that license (including the patent grant where applicable). See the license text for full conditions.
+
+- **Copyright:** [NOTICE](NOTICE) states project copyright and trademark notices required or recommended when redistributing under Apache 2.0. If you are the sole copyright holder preparing a sale or exclusive license, replace *OpenRouter Studio authors* in `LICENSE`, `NOTICE`, and this file with your legal name or entity so counterparties can identify assignable rights.
+- **Trademarks:** *OpenRouter* and related marks belong to their respective owners. This studio is a separate product; the name refers to API compatibility only unless you have a separate trademark agreement.
+- **Dependencies:** Third-party packages remain under their own licenses.
+
+### For OpenRouter and strategic partners
+
+The maintainers welcome good-faith conversations about **acquisition**, **exclusive or enterprise licensing**, **official product or hosting integration**, or **partnership** with OpenRouter or other organizations. Nothing in the Apache license obliges the authors to grant additional rights beyond that license; anything beyond the public license is subject to a separate written agreement.
+
+**How to reach out:** use GitHub Discussions or Issues on this repository, or your usual business development channel, and reference “OpenRouter Studio / licensing or partnership.”

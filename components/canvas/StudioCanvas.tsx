@@ -5,12 +5,14 @@ import {
   ReactFlow,
   MiniMap,
   Controls,
+  ControlButton,
   Background,
   BackgroundVariant,
   type ReactFlowInstance,
   type Edge,
   type Connection,
 } from "@xyflow/react";
+import { Grid3x3Icon } from "lucide-react";
 import "@xyflow/react/dist/style.css";
 
 import {
@@ -20,6 +22,10 @@ import {
   STUDIO_NODE_CLIPBOARD_VERSION,
 } from "@/lib/store";
 import { nodeTypes } from "./nodes";
+import { toast } from "@/lib/toast";
+
+/** Must match `<Background gap={...} />` and `snapGrid` on `<ReactFlow />`. */
+const CANVAS_GRID = 16;
 
 function isEditableEventTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
@@ -44,6 +50,9 @@ export function StudioCanvas() {
   const undo = useStudioStore((s) => s.undo);
   const redo = useStudioStore((s) => s.redo);
   const theme = useStudioStore((s) => s.theme);
+  const snapToGrid = useStudioStore((s) => s.snapToGrid);
+  const toggleSnapToGrid = useStudioStore((s) => s.toggleSnapToGrid);
+  const snapAllNodesToGrid = useStudioStore((s) => s.snapAllNodesToGrid);
   const nodeOutputs = useStudioStore((s) => s.nodeOutputs);
 
   const rfInstance = useRef<ReactFlowInstance | null>(null);
@@ -170,6 +179,8 @@ export function StudioCanvas() {
         minZoom={0.08}
         maxZoom={4}
         deleteKeyCode={["Backspace", "Delete"]}
+        snapToGrid={snapToGrid}
+        snapGrid={[CANVAS_GRID, CANVAS_GRID]}
         colorMode={isDark ? "dark" : "light"}
         edgesReconnectable
         defaultEdgeOptions={{
@@ -179,14 +190,43 @@ export function StudioCanvas() {
           interactionWidth: 20,
         }}
       >
-        <Controls />
+        <Controls>
+          <ControlButton
+            onClick={(e) => {
+              if (e.altKey) {
+                const n = useStudioStore.getState().nodes.length;
+                if (n === 0) {
+                  toast.info("No nodes to align");
+                  return;
+                }
+                snapAllNodesToGrid();
+                toast.success("Nodes aligned to grid");
+              } else {
+                toggleSnapToGrid();
+              }
+            }}
+            title={
+              snapToGrid
+                ? "Grid snap on (click to turn off; Alt+click: align all nodes)"
+                : "Snap to grid while dragging (click to turn on; Alt+click: align all nodes)"
+            }
+            aria-pressed={snapToGrid}
+            className={
+              snapToGrid
+                ? "!bg-primary/20 !text-primary [&_svg]:text-primary"
+                : undefined
+            }
+          >
+            <Grid3x3Icon className="size-4" strokeWidth={2} />
+          </ControlButton>
+        </Controls>
         <MiniMap
           nodeColor={isDark ? "#333" : "#d4d4d4"}
           maskColor={isDark ? "rgba(0,0,0,0.5)" : "rgba(255,255,255,0.6)"}
         />
         <Background
           variant={BackgroundVariant.Dots}
-          gap={16}
+          gap={CANVAS_GRID}
           size={1}
           color={isDark ? "#333" : "#d4d4d4"}
         />

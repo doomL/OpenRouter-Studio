@@ -19,6 +19,7 @@ import { HandleLabel } from "@/components/canvas/HandleLabel";
 import { getCanvasSelectContentProps } from "@/lib/canvas-floating-props";
 import { modalitiesForImageRequest } from "@/lib/models";
 import { readJsonResponse } from "@/lib/read-json-response";
+import { fetchWithRetry, STUDIO_FETCH_MAX_ATTEMPTS } from "@/lib/fetch-with-retry";
 
 function ImageNodeComponent({ id, data }: NodeProps) {
   const updateNodeData = useStudioStore((s) => s.updateNodeData);
@@ -92,19 +93,48 @@ function ImageNodeComponent({ id, data }: NodeProps) {
         body.images = refUrls;
       }
 
-      const res = await fetch("/api/openrouter/image", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": apiKey,
+      const res = await fetchWithRetry(
+        "/api/openrouter/image",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": apiKey,
+          },
+          body: JSON.stringify(body),
         },
-        body: JSON.stringify(body),
-      });
+        { maxAttempts: STUDIO_FETCH_MAX_ATTEMPTS }
+      );
 
       const result = await readJsonResponse<{
-        error?: { message?: string };
+        error?: unknown;
         data?: Array<{ url?: string }>;
+        message?: string;
       }>(res);
+
+      // 502/504 from nginx often omit our `error` shape — don't mis-report as "no image".
+      if (!res.ok) {
+        const errField = result.error;
+        if (typeof errField === "string") {
+          throw new Error(`${errField} (HTTP ${res.status})`);
+        }
+        if (errField && typeof errField === "object") {
+          const o = errField as { message?: string; hint?: string };
+          let msg =
+            typeof o.message === "string" ? o.message : JSON.stringify(errField);
+          if (typeof o.hint === "string" && o.hint.trim()) {
+            msg += `\n\n${o.hint.trim()}`;
+          }
+          throw new Error(`${msg} (HTTP ${res.status})`);
+        }
+        if (typeof result.message === "string" && result.message.trim()) {
+          throw new Error(`${result.message} (HTTP ${res.status})`);
+        }
+        throw new Error(
+          `Image request failed (HTTP ${res.status}). If this happens almost instantly, your reverse proxy may be returning 502 before the app finishes — increase proxy_read_timeout (see deploy/nginx-reverse-proxy.example.conf). Body: ${JSON.stringify(result).slice(0, 500)}`
+        );
+      }
+
       if (result.error) {
         const err = result.error as { message?: string; hint?: string };
         let msg =
@@ -120,7 +150,11 @@ function ImageNodeComponent({ id, data }: NodeProps) {
       }
 
       const imageUrl = result.data?.[0]?.url;
-      if (!imageUrl) throw new Error("No image in response");
+      if (!imageUrl) {
+        throw new Error(
+          "No image URL in response (unexpected shape). Check the Network tab for /api/openrouter/image — if status is 502, fix proxy timeouts; if 200, try another image-capable model."
+        );
+      }
 
       const finalUrl = imageUrl.startsWith("data:")
         ? imageUrl

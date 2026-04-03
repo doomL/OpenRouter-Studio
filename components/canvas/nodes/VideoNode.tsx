@@ -17,6 +17,7 @@ import { useStudioStore } from "@/lib/store";
 import { getNodeInputs, getImageRefInputs } from "@/lib/execution";
 import { resolveVideoFrameRefsFromEdges } from "@/lib/video-frame";
 import { readJsonResponse } from "@/lib/read-json-response";
+import { fetchWithRetry, STUDIO_FETCH_MAX_ATTEMPTS } from "@/lib/fetch-with-retry";
 import { ModelSelector } from "@/components/ui/ModelSelector";
 import { ZapIcon, AlertTriangleIcon, ClockIcon, Volume2Icon, VolumeXIcon } from "lucide-react";
 import { HandleLabel } from "@/components/canvas/HandleLabel";
@@ -131,9 +132,10 @@ function VideoNodeComponent({ id, data }: NodeProps) {
 
     pollingRef.current = setInterval(async () => {
       try {
-        const res = await fetch(
+        const res = await fetchWithRetry(
           `/api/openrouter/video?jobId=${videoJob.jobId}`,
-          { headers: { "x-api-key": apiKey } }
+          { headers: { "x-api-key": apiKey } },
+          { maxAttempts: STUDIO_FETCH_MAX_ATTEMPTS, baseDelayMs: 500 }
         );
         const result = await readJsonResponse<{
           status?: string;
@@ -247,14 +249,18 @@ function VideoNodeComponent({ id, data }: NodeProps) {
         body.input_references = inputRefs;
       }
 
-      const res = await fetch("/api/openrouter/video", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": apiKey,
+      const res = await fetchWithRetry(
+        "/api/openrouter/video",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": apiKey,
+          },
+          body: JSON.stringify(body),
         },
-        body: JSON.stringify(body),
-      });
+        { maxAttempts: STUDIO_FETCH_MAX_ATTEMPTS }
+      );
 
       const result = await readJsonResponse<{
         error?: { message?: string } | string;
