@@ -385,15 +385,19 @@ export default function StudioPage() {
             <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={handleImport} title="Import workflow from JSON">
               <UploadIcon className="size-3.5" />
             </Button>
+
+            <div className="mx-1 h-4 w-px bg-studio-node-border" />
+
             <Button
               variant="ghost"
               size="sm"
-              className="h-7 w-7 p-0"
+              className="h-7 text-xs gap-1"
               onClick={() => void handleDownloadAllMedia()}
               disabled={isDownloadingMediaZip}
               title="Download all images and videos as ZIP"
             >
               <FolderArchiveIcon className="size-3.5" />
+              {isDownloadingMediaZip ? "Zipping..." : "Media ZIP"}
             </Button>
             <input
               ref={fileInputRef}
