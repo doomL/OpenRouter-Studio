@@ -19,7 +19,7 @@ import { resolveVideoFrameRefsFromEdges } from "@/lib/video-frame";
 import { readJsonResponse } from "@/lib/read-json-response";
 import { fetchWithRetry, STUDIO_FETCH_MAX_ATTEMPTS } from "@/lib/fetch-with-retry";
 import { ModelSelector } from "@/components/ui/ModelSelector";
-import { ZapIcon, AlertTriangleIcon, ClockIcon, Volume2Icon, VolumeXIcon } from "lucide-react";
+import { AlertTriangleIcon, ClockIcon, Volume2Icon, VolumeXIcon } from "lucide-react";
 import { HandleLabel } from "@/components/canvas/HandleLabel";
 import { getCanvasSelectContentProps } from "@/lib/canvas-floating-props";
 
@@ -80,6 +80,7 @@ function VideoNodeComponent({ id, data }: NodeProps) {
   const duration = (data.duration as number) || 4;
   const aspectRatio = (data.aspectRatio as string) || "16:9";
   const resolution = (data.resolution as string) || "";
+  const size = (data.size as string) || "";
   const generateAudio = (data.generateAudio as boolean) ?? true;
   const seed = (data.seed as string) || "";
 
@@ -199,12 +200,16 @@ function VideoNodeComponent({ id, data }: NodeProps) {
         model,
         prompt,
         duration,
-        aspect_ratio: aspectRatio,
       };
 
-      // Resolution (optional, cannot combine with size)
-      if (resolution) {
-        body.resolution = resolution;
+      // Size (WIDTHxHEIGHT) takes precedence — interchangeable with resolution + aspect_ratio
+      if (size) {
+        body.size = size;
+      } else {
+        body.aspect_ratio = aspectRatio;
+        if (resolution) {
+          body.resolution = resolution;
+        }
       }
 
       // Audio generation
@@ -298,6 +303,7 @@ function VideoNodeComponent({ id, data }: NodeProps) {
     duration,
     aspectRatio,
     resolution,
+    size,
     generateAudio,
     seed,
     params.audio,
@@ -323,13 +329,6 @@ function VideoNodeComponent({ id, data }: NodeProps) {
     >
       <div className="rounded-t-lg bg-blue-700 px-3 py-1.5 text-xs font-semibold text-white flex items-center gap-2">
         Video Generation
-        <Badge
-          variant="outline"
-          className="text-[9px] h-4 border-yellow-500 text-yellow-300 gap-0.5"
-        >
-          <ZapIcon className="size-2.5" />
-          Alpha
-        </Badge>
       </div>
       <div className="space-y-2 p-3 nopan nodrag nowheel">
         <ModelSelector
@@ -397,6 +396,25 @@ function VideoNodeComponent({ id, data }: NodeProps) {
               ))}
             </SelectContent>
           </Select>
+        </div>
+
+        {/* Size (WIDTHxHEIGHT) — overrides resolution + aspect_ratio */}
+        <div>
+          <Label className="text-xs text-muted-foreground">
+            Size <span className="text-[9px] opacity-60">(WxH, e.g. 1280x720)</span>
+          </Label>
+          <Input
+            type="text"
+            value={size}
+            onChange={(e) => updateNodeData(id, { size: e.target.value })}
+            placeholder="Auto (use resolution + ratio)"
+            className="h-7 text-xs bg-studio-node-input border-studio-node-border"
+          />
+          {size && (
+            <p className="text-[9px] text-muted-foreground mt-0.5">
+              Overrides resolution &amp; aspect ratio
+            </p>
+          )}
         </div>
 
         {/* Audio toggle */}

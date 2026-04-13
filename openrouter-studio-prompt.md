@@ -203,16 +203,16 @@ Il frontend cachea la lista in memoria (React state / Zustand) per la sessione.
 // Ritorna: { data: [{ url: string }] }
 ```
 
-#### `/api/openrouter/video` — endpoint multipli (alpha async)
+#### `/api/openrouter/video` — endpoint multipli (v1 async)
 
-**⚠️ La generazione video usa `POST /api/alpha/videos`, NON `/v1/chat/completions`.**
+**La generazione video usa `POST /api/v1/videos`, NON `/v1/chat/completions`.**
 Il flusso è asincrono in 3 step: submit → polling → download.
 
 ```typescript
 // POST /api/openrouter/video — sottomette il job
 // Body:
 {
-  model: string,           // "google/veo-3.1" | "openai/sora-2-pro" | "bytedance/seedance-1-5-pro"
+  model: string,           // modelli video disponibili da /api/v1/models?output_modalities=video
   prompt: string,
   duration?: number,       // veo-3.1: 4/6/8s | sora-2-pro: 4/8/12/16/20s | seedance: 4-12s
   resolution?: string,     // "480p" | "720p" | "1080p" | "4K" — NON combinare con size
@@ -224,17 +224,17 @@ Il flusso è asincrono in 3 step: submit → polling → download.
   // url può essere HTTPS o data URI base64
   // Limiti per modello: veo-3.1 (1 i2v + fino a 3 ref), sora-2-pro (1 max), seedance (1-2 first/last frame)
 }
-// → Chiama POST https://openrouter.ai/api/alpha/videos
+// → Chiama POST https://openrouter.ai/api/v1/videos
 // → Risposta HTTP 202: { id: "vgen_...", polling_url: "...", status: "pending" }
 
 // GET /api/openrouter/video?jobId=vgen_... — polling status
-// → Chiama GET https://openrouter.ai/api/alpha/videos/:jobId
+// → Chiama GET https://openrouter.ai/api/v1/videos/:jobId
 // → Statuses: "pending" | "in_progress" | "completed" | "failed" | "cancelled" | "expired"
-// → Quando completed: { ..., unsigned_urls: ["https://openrouter.ai/api/alpha/videos/:id/content?index=0"] }
+// → Quando completed: { ..., unsigned_urls: ["https://openrouter.ai/api/v1/videos/:id/content?index=0"] }
 // → Quando failed: { ..., error: "stringa errore" }
 
 // GET /api/openrouter/video/download?jobId=vgen_...&index=0 — scarica il video
-// → Chiama GET https://openrouter.ai/api/alpha/videos/:jobId/content?index=0
+// → Chiama GET https://openrouter.ai/api/v1/videos/:jobId/content?index=0
 // → Proxy dei byte MP4 raw al client
 // ⚠️ Gli URL video scadono entro 1-48h — il VideoNode deve avvisare l'utente di scaricare
 ```

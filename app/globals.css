@@ -154,6 +154,25 @@
   }
 }
 
+/* React Flow: node selection */
+.react-flow__node.selected > div {
+  box-shadow: 0 0 0 2px #3b82f6, 0 0 12px 0 rgba(59, 130, 246, 0.35);
+}
+.react-flow__node.selected > div::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  border: 2px solid #3b82f6;
+  pointer-events: none;
+}
+
+/* React Flow: multi-select drag rectangle */
+.react-flow__selection {
+  border: 1.5px dashed #3b82f6 !important;
+  background: rgba(59, 130, 246, 0.08) !important;
+}
+
 /* React Flow: edge selection & hover */
 .react-flow__edge.selectable:hover .react-flow__edge-path {
   stroke: #f97316 !important;

@@ -6,6 +6,12 @@ import type { NodeOutput } from "./store";
 /**
  * For each edge from another node's **video out** to this node's `first_frame` or `last_frame`,
  * decode a JPEG data URL from that video (browser canvas) so it can be sent as `input_references`.
+ *
+ * Frame extraction logic for video continuation:
+ *   - video_url → first_frame: extracts the **last** frame of the source video
+ *     (so the new video continues from where the old one ended)
+ *   - video_url → last_frame: extracts the **first** frame of the source video
+ *     (so the new video ends where the source video started)
  */
 export async function resolveVideoFrameRefsFromEdges(
   nodeId: string,
@@ -20,7 +26,9 @@ export async function resolveVideoFrameRefsFromEdges(
     const out = nodeOutputs[edge.source];
     const videoUrl = out?.video_url;
     if (!videoUrl) continue;
-    const which = th === "first_frame" ? "first" : "last";
+    // When continuing a video chain, the first frame of the new clip should be
+    // the last frame of the previous clip (and vice-versa for last_frame).
+    const which = th === "first_frame" ? "last" : "first";
     const url = await extractVideoFrameAsDataUrl(videoUrl, which);
     results.push({ handle: th, url });
   }
