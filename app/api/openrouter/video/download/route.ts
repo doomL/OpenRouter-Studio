@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const url = `https://openrouter.ai/api/alpha/videos/${encodeURIComponent(jobId)}/content?index=${index}`;
+    const url = `https://openrouter.ai/api/v1/videos/${encodeURIComponent(jobId)}/content?index=${index}`;
     const res = await fetchWithRetry(
       url,
       { headers: { Authorization: `Bearer ${apiKey}` } },

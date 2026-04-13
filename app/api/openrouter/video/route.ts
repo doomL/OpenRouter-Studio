@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const res = await fetchFromOpenRouter("/alpha/videos", apiKey, {
+    const res = await fetchFromOpenRouter("/v1/videos", apiKey, {
       method: "POST",
       body: JSON.stringify(body),
     });
@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const url = `https://openrouter.ai/api/alpha/videos/${encodeURIComponent(jobId)}`;
+    const url = `https://openrouter.ai/api/v1/videos/${encodeURIComponent(jobId)}`;
     const res = await fetch(url, {
       headers: {
         Authorization: `Bearer ${apiKey}`,
