@@ -8,6 +8,7 @@ import {
   ControlButton,
   Background,
   BackgroundVariant,
+  SelectionMode,
   type ReactFlowInstance,
   type Edge,
   type Connection,
@@ -179,6 +180,9 @@ export function StudioCanvas() {
         minZoom={0.08}
         maxZoom={4}
         deleteKeyCode={["Backspace", "Delete"]}
+        selectionOnDrag
+        selectionMode={SelectionMode.Partial}
+        panOnDrag={[1, 2]}
         snapToGrid={snapToGrid}
         snapGrid={[CANVAS_GRID, CANVAS_GRID]}
         colorMode={isDark ? "dark" : "light"}
