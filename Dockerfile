@@ -9,6 +9,10 @@ FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+# Prisma 7 reads `DATABASE_URL` from the environment for `prisma.config.ts`; Next may import the
+# client during `next build`. Compose only sets the real URL at runtime, so use a placeholder here.
+ARG DATABASE_URL=postgresql://build:build@127.0.0.1:5432/build
+ENV DATABASE_URL=$DATABASE_URL
 # Generated client is gitignored; must exist before `next build` (imports `@/lib/generated/prisma/client`)
 RUN npx prisma generate && npm run build
 
@@ -21,6 +25,7 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
+COPY --from=builder --chown=nextjs:nodejs /app/prisma.config.ts ./prisma.config.ts
 # Prisma CLI for `migrate deploy` at container start (not included in Next standalone bundle)
 USER root
 RUN npm install prisma@7.5.0 --prefix /app --no-save
