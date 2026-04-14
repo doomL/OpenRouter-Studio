@@ -36,8 +36,9 @@ services:
       # PostgreSQL connection via the `postgres` service above.
       # Override POSTGRES_PASSWORD in `.env` to use a custom password.
       DATABASE_URL: "postgresql://studio:${POSTGRES_PASSWORD:-studio_secret}@postgres:5432/openrouter_studio"
-      # Limit Node.js heap to prevent OOM crashes. Raise if you have more RAM available.
-      NODE_OPTIONS: "--max-old-space-size=768"
+      # Raise Node.js V8 heap limit (default ~1.5 GB regardless of server RAM).
+      # Adjust to ~75 % of available RAM; e.g. 8 GB server → 6144, 16 GB → 12288.
+      NODE_OPTIONS: "--max-old-space-size=4096"
 
 volumes:
   postgres-data:
