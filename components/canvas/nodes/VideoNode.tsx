@@ -77,6 +77,7 @@ function VideoNodeComponent({ id, data }: NodeProps) {
     useStudioStore((s) => s.dynamicHandleCounts[id]?.character_ref) || 1;
 
   const model = (data.model as string) || "";
+  const nodeLabel = (data.label as string) || "Video Generation";
   const duration = (data.duration as number) || 4;
   const aspectRatio = (data.aspectRatio as string) || "16:9";
   const resolution = (data.resolution as string) || "";
@@ -327,8 +328,16 @@ function VideoNodeComponent({ id, data }: NodeProps) {
     <div
       className={`min-w-[280px] rounded-lg border-2 ${borderColor} bg-studio-node shadow-lg relative`}
     >
-      <div className="rounded-t-lg bg-blue-700 px-3 py-1.5 text-xs font-semibold text-white flex items-center gap-2">
-        Video Generation
+      <div className="rounded-t-lg bg-blue-700 px-3 py-1.5 text-xs font-semibold text-white flex items-center justify-between gap-2">
+        <span>{nodeLabel}</span>
+        <Input
+          value={nodeLabel === "Video Generation" ? "" : nodeLabel}
+          onChange={(e) =>
+            updateNodeData(id, { label: e.target.value || "Video Generation" })
+          }
+          placeholder="Label..."
+          className="h-5 w-24 border-0 bg-transparent px-1 text-[10px] text-right text-blue-100 placeholder:text-blue-200/60 focus-visible:ring-0"
+        />
       </div>
       <div className="space-y-2 p-3 nopan nodrag nowheel">
         <ModelSelector

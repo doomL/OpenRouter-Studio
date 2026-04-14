@@ -3,8 +3,9 @@
 import { memo, useCallback, useEffect, useMemo } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Slider } from "@/components/ui/slider";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -34,9 +35,15 @@ function ImageNodeComponent({ id, data }: NodeProps) {
     useStudioStore((s) => s.dynamicHandleCounts[id]?.image_ref) || 1;
 
   const model = (data.model as string) || "";
+  const nodeLabel = (data.label as string) || "Image Generation";
   const aspectRatio = (data.aspectRatio as string) || "1:1";
-  const refWeight = (data.refWeight as number) ?? 0.5;
+  const imageSize = (data.imageSize as string) || "1K";
   const mode = (data.mode as string) || "text2img";
+  const font1Url = (data.font1Url as string) || "";
+  const font1Text = (data.font1Text as string) || "";
+  const font2Url = (data.font2Url as string) || "";
+  const font2Text = (data.font2Text as string) || "";
+  const superResolutionRefsText = (data.superResolutionRefsText as string) || "";
 
   // Restore output from persisted node data on mount
   useEffect(() => {
@@ -60,6 +67,7 @@ function ImageNodeComponent({ id, data }: NodeProps) {
       r.handle.startsWith("image_ref_")
     );
   }, [id, edges, nodeOutputs, nodes]);
+  const isSourcefulModel = model.startsWith("sourceful/");
 
   const handleCount = Math.max(dynamicCount, connectedRefs.length + 1);
 
@@ -78,6 +86,7 @@ function ImageNodeComponent({ id, data }: NodeProps) {
         prompt,
         mode,
         aspect_ratio: aspectRatio,
+        image_size: imageSize,
         modalities: modalitiesForImageRequest(imageMeta?.output_modalities),
       };
 
@@ -91,6 +100,24 @@ function ImageNodeComponent({ id, data }: NodeProps) {
         .map((r) => r.url);
       if (refUrls.length > 0) {
         body.images = refUrls;
+      }
+
+      if (isSourcefulModel) {
+        const fontInputs = [
+          { font_url: font1Url.trim(), text: font1Text.trim() },
+          { font_url: font2Url.trim(), text: font2Text.trim() },
+        ].filter((x) => x.font_url.length > 0 && x.text.length > 0);
+
+        const superResolutionRefs = superResolutionRefsText
+          .split(/\r?\n|,/)
+          .map((x) => x.trim())
+          .filter((x) => x.length > 0)
+          .slice(0, 4);
+
+        if (fontInputs.length > 0) body.font_inputs = fontInputs.slice(0, 2);
+        if (superResolutionRefs.length > 0) {
+          body.super_resolution_references = superResolutionRefs;
+        }
       }
 
       const res = await fetchWithRetry(
@@ -177,7 +204,14 @@ function ImageNodeComponent({ id, data }: NodeProps) {
     nodes,
     nodeOutputs,
     aspectRatio,
+    imageSize,
     mode,
+    isSourcefulModel,
+    font1Url,
+    font1Text,
+    font2Url,
+    font2Text,
+    superResolutionRefsText,
     setNodeOutput,
     updateNodeData,
   ]);
@@ -186,8 +220,16 @@ function ImageNodeComponent({ id, data }: NodeProps) {
     <div
       className={`min-w-[260px] rounded-lg border-2 ${borderColor} bg-studio-node shadow-lg relative`}
     >
-      <div className="rounded-t-lg bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white">
-        Image Generation
+      <div className="rounded-t-lg bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white flex items-center justify-between gap-2">
+        <span>{nodeLabel}</span>
+        <Input
+          value={nodeLabel === "Image Generation" ? "" : nodeLabel}
+          onChange={(e) =>
+            updateNodeData(id, { label: e.target.value || "Image Generation" })
+          }
+          placeholder="Label..."
+          className="h-5 w-24 border-0 bg-transparent px-1 text-[10px] text-right text-orange-100 placeholder:text-orange-200/60 focus-visible:ring-0"
+        />
       </div>
       <div className="space-y-2 p-3 nopan nodrag nowheel">
         <ModelSelector
@@ -226,26 +268,109 @@ function ImageNodeComponent({ id, data }: NodeProps) {
             </SelectTrigger>
             <SelectContent {...getCanvasSelectContentProps()}>
               <SelectItem value="1:1">1:1</SelectItem>
+              <SelectItem value="2:3">2:3</SelectItem>
+              <SelectItem value="3:2">3:2</SelectItem>
+              <SelectItem value="3:4">3:4</SelectItem>
               <SelectItem value="16:9">16:9</SelectItem>
               <SelectItem value="9:16">9:16</SelectItem>
               <SelectItem value="4:3">4:3</SelectItem>
+              <SelectItem value="4:5">4:5</SelectItem>
+              <SelectItem value="5:4">5:4</SelectItem>
+              <SelectItem value="21:9">21:9</SelectItem>
+              <SelectItem value="1:4">1:4</SelectItem>
+              <SelectItem value="4:1">4:1</SelectItem>
+              <SelectItem value="1:8">1:8</SelectItem>
+              <SelectItem value="8:1">8:1</SelectItem>
             </SelectContent>
           </Select>
         </div>
 
         <div>
-          <Label className="text-xs text-muted-foreground">
-            Reference Weight: {refWeight.toFixed(1)}
-          </Label>
-          <Slider
-            value={[refWeight]}
-            onValueChange={(v) => updateNodeData(id, { refWeight: Array.isArray(v) ? v[0] : v })}
-            min={0}
-            max={1}
-            step={0.1}
-            className="mt-1"
-          />
+          <Label className="text-xs text-muted-foreground">Image Size</Label>
+          <Select
+            value={imageSize}
+            onValueChange={(v) => v && updateNodeData(id, { imageSize: v })}
+          >
+            <SelectTrigger className="h-7 text-xs bg-studio-node-input border-studio-node-border">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent {...getCanvasSelectContentProps()}>
+              <SelectItem value="0.5K">0.5K</SelectItem>
+              <SelectItem value="1K">1K</SelectItem>
+              <SelectItem value="2K">2K</SelectItem>
+              <SelectItem value="4K">4K</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
+
+        {isSourcefulModel && (
+          <>
+            <div className="rounded border border-studio-node-border p-2 space-y-2">
+              <p className="text-[10px] text-muted-foreground">
+                Sourceful: Font Inputs (max 2)
+              </p>
+              <div>
+                <Label className="text-[10px] text-muted-foreground">Font 1 URL</Label>
+                <Input
+                  type="url"
+                  value={font1Url}
+                  onChange={(e) => updateNodeData(id, { font1Url: e.target.value })}
+                  placeholder="https://example.com/font.ttf"
+                  className="h-7 text-xs bg-studio-node-input border-studio-node-border"
+                />
+              </div>
+              <div>
+                <Label className="text-[10px] text-muted-foreground">Font 1 Text</Label>
+                <Input
+                  type="text"
+                  value={font1Text}
+                  onChange={(e) => updateNodeData(id, { font1Text: e.target.value })}
+                  placeholder="Headline text"
+                  className="h-7 text-xs bg-studio-node-input border-studio-node-border"
+                />
+              </div>
+              <div>
+                <Label className="text-[10px] text-muted-foreground">Font 2 URL</Label>
+                <Input
+                  type="url"
+                  value={font2Url}
+                  onChange={(e) => updateNodeData(id, { font2Url: e.target.value })}
+                  placeholder="https://example.com/font2.ttf"
+                  className="h-7 text-xs bg-studio-node-input border-studio-node-border"
+                />
+              </div>
+              <div>
+                <Label className="text-[10px] text-muted-foreground">Font 2 Text</Label>
+                <Input
+                  type="text"
+                  value={font2Text}
+                  onChange={(e) => updateNodeData(id, { font2Text: e.target.value })}
+                  placeholder="Subheadline text"
+                  className="h-7 text-xs bg-studio-node-input border-studio-node-border"
+                />
+              </div>
+            </div>
+
+            <div className="rounded border border-studio-node-border p-2 space-y-1">
+              <Label className="text-[10px] text-muted-foreground">
+                Sourceful: Super Resolution References (max 4, one URL per line)
+              </Label>
+              <Textarea
+                value={superResolutionRefsText}
+                onChange={(e) =>
+                  updateNodeData(id, { superResolutionRefsText: e.target.value })
+                }
+                placeholder={"https://example.com/ref1.jpg\nhttps://example.com/ref2.jpg"}
+                className="min-h-[64px] text-xs bg-studio-node-input border-studio-node-border"
+              />
+              {mode !== "img2img" && (
+                <p className="text-[9px] text-muted-foreground">
+                  Used by Sourceful in Image to Image mode.
+                </p>
+              )}
+            </div>
+          </>
+        )}
 
         {connectedRefs.length > 0 && (
           <div className="flex gap-1 flex-wrap">

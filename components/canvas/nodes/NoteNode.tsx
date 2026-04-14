@@ -2,6 +2,7 @@
 
 import { memo, useCallback } from "react";
 import { type NodeProps } from "@xyflow/react";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useStudioStore } from "@/lib/store";
 
@@ -10,6 +11,7 @@ function NoteNodeComponent({ id, data }: NodeProps) {
 
   const text = (data.text as string) || "";
   const color = (data.color as string) || "yellow";
+  const nodeLabel = (data.label as string) || "Note";
 
   const colors: Record<string, { bg: string; border: string; header: string }> = {
     yellow: { bg: "bg-yellow-50 dark:bg-yellow-900/20", border: "border-yellow-300 dark:border-yellow-700", header: "bg-yellow-200 dark:bg-yellow-800" },
@@ -39,10 +41,16 @@ function NoteNodeComponent({ id, data }: NodeProps) {
         className={`flex items-center justify-between rounded-t-lg ${c.header} px-3 py-1 cursor-pointer`}
         onClick={cycleColor}
       >
-        <span className="text-[10px] font-semibold text-foreground/70">Note</span>
+        <span className="text-[10px] font-semibold text-foreground/70">{nodeLabel}</span>
         <span className="text-[9px] text-foreground/50">click to change color</span>
       </div>
       <div className="w-full min-w-[200px] p-2 nopan nodrag nowheel">
+        <Input
+          value={nodeLabel === "Note" ? "" : nodeLabel}
+          onChange={(e) => updateNodeData(id, { label: e.target.value || "Note" })}
+          placeholder="Label..."
+          className="mb-1 h-6 text-[10px] bg-transparent"
+        />
         <Textarea
           value={text}
           onChange={(e) => handleTextChange(e.target.value)}

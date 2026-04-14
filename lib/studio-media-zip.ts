@@ -6,6 +6,29 @@ function safeSegment(id: string): string {
   return id.replace(/[^a-zA-Z0-9_-]+/g, "_").slice(0, 80);
 }
 
+function defaultNodeLabelByType(type: string): string {
+  switch (type) {
+    case "imageInput":
+      return "Image Input";
+    case "mediaInput":
+      return "Media Input";
+    case "imageGen":
+      return "Image Generation";
+    case "videoGen":
+      return "Video Generation";
+    case "llm":
+      return "LLM Chat";
+    case "prompt":
+      return "Prompt";
+    case "output":
+      return "Output";
+    case "note":
+      return "Note";
+    default:
+      return "Node";
+  }
+}
+
 function extFromDataUrl(url: string): string {
   const m = /^data:image\/(\w+);/i.exec(url);
   if (m) return m[1].toLowerCase() === "jpeg" ? "jpg" : m[1].toLowerCase();
@@ -97,6 +120,14 @@ function getOutputNodeUpstreamMedia(
   return { images, videos };
 }
 
+function getNodeFileBase(node: Node): string {
+  const d = (node.data || {}) as Record<string, unknown>;
+  const customLabel =
+    typeof d.label === "string" ? d.label.trim() : "";
+  if (customLabel.length > 0) return safeSegment(customLabel);
+  return safeSegment(defaultNodeLabelByType(node.type ?? ""));
+}
+
 export interface BuildStudioMediaZipResult {
   blob: Blob;
   fileCount: number;
@@ -151,7 +182,7 @@ export async function buildStudioMediaZip(
   };
 
   for (const node of nodes) {
-    const sid = safeSegment(node.id);
+    const sid = getNodeFileBase(node);
     const d = (node.data || {}) as Record<string, unknown>;
     const out = nodeOutputs[node.id];
     const type = node.type ?? "";

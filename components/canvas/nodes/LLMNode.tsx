@@ -3,6 +3,7 @@
 import { memo, useCallback, useEffect, useState } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { useStudioStore } from "@/lib/store";
@@ -26,6 +27,7 @@ function LLMNodeComponent({ id, data }: NodeProps) {
   const model = (data.model as string) || "";
   const temperature = (data.temperature as number) ?? 0.7;
   const maxTokens = (data.maxTokens as number) ?? 1024;
+  const nodeLabel = (data.label as string) || "LLM Chat";
 
   // Restore output from persisted node data on mount
   useEffect(() => {
@@ -151,8 +153,14 @@ function LLMNodeComponent({ id, data }: NodeProps) {
     <div
       className={`min-w-[260px] rounded-lg border-2 ${borderColor} bg-studio-node shadow-lg relative`}
     >
-      <div className="rounded-t-lg bg-purple-700 px-3 py-1.5 text-xs font-semibold text-white">
-        LLM Chat
+      <div className="rounded-t-lg bg-purple-700 px-3 py-1.5 text-xs font-semibold text-white flex items-center justify-between gap-2">
+        <span>{nodeLabel}</span>
+        <Input
+          value={nodeLabel === "LLM Chat" ? "" : nodeLabel}
+          onChange={(e) => updateNodeData(id, { label: e.target.value || "LLM Chat" })}
+          placeholder="Label..."
+          className="h-5 w-24 border-0 bg-transparent px-1 text-[10px] text-right text-purple-200 placeholder:text-purple-300/60 focus-visible:ring-0"
+        />
       </div>
       <div className="space-y-2 p-3 nopan nodrag nowheel">
         <ModelSelector

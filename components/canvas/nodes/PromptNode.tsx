@@ -14,6 +14,7 @@ function PromptNodeComponent({ id, data }: NodeProps) {
 
   const prompt = (data.prompt as string) || "";
   const systemPrompt = (data.systemPrompt as string) || "";
+  const nodeLabel = (data.label as string) || "Prompt";
 
   // Sync output on mount (covers page refresh / workflow load)
   useEffect(() => {
@@ -41,8 +42,14 @@ function PromptNodeComponent({ id, data }: NodeProps) {
       className="min-w-[240px] w-max max-w-[min(100vw-1rem,90vw)] rounded-lg border border-studio-node-border bg-studio-node shadow-lg"
       style={{ position: "relative" }}
     >
-      <div className="rounded-t-lg bg-gray-600 px-3 py-1.5 text-xs font-semibold text-white">
-        Prompt
+      <div className="rounded-t-lg bg-gray-600 px-3 py-1.5 text-xs font-semibold text-white flex items-center justify-between gap-2">
+        <span>{nodeLabel}</span>
+        <Input
+          value={nodeLabel === "Prompt" ? "" : nodeLabel}
+          onChange={(e) => updateNodeData(id, { label: e.target.value || "Prompt" })}
+          placeholder="Label..."
+          className="h-5 w-24 border-0 bg-transparent px-1 text-[10px] text-right text-gray-200 placeholder:text-gray-300/60 focus-visible:ring-0"
+        />
       </div>
       <div className="w-full min-w-[240px] space-y-2 p-3 nopan nodrag nowheel">
         <div className="w-full">

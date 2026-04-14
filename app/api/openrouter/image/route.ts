@@ -23,6 +23,8 @@ export async function POST(req: NextRequest) {
       images: imagesFromBody,
       aspect_ratio,
       image_size,
+      font_inputs,
+      super_resolution_references,
       mode,
       modalities: modalitiesFromBody,
     } = body;
@@ -74,6 +76,30 @@ export async function POST(req: NextRequest) {
     const imageConfig: Record<string, unknown> = {};
     if (aspect_ratio) imageConfig.aspect_ratio = aspect_ratio;
     if (image_size) imageConfig.image_size = image_size;
+
+    if (Array.isArray(font_inputs)) {
+      const normalizedFonts = font_inputs
+        .filter((x): x is Record<string, unknown> => !!x && typeof x === "object")
+        .map((x) => ({
+          font_url: typeof x.font_url === "string" ? x.font_url.trim() : "",
+          text: typeof x.text === "string" ? x.text.trim() : "",
+        }))
+        .filter((x) => x.font_url.length > 0 && x.text.length > 0)
+        .slice(0, 2);
+      if (normalizedFonts.length > 0) imageConfig.font_inputs = normalizedFonts;
+    }
+
+    if (Array.isArray(super_resolution_references)) {
+      const normalizedRefs = super_resolution_references
+        .filter((x): x is string => typeof x === "string")
+        .map((x) => x.trim())
+        .filter((x) => x.length > 0)
+        .slice(0, 4);
+      if (normalizedRefs.length > 0) {
+        imageConfig.super_resolution_references = normalizedRefs;
+      }
+    }
+
     if (Object.keys(imageConfig).length > 0) {
       payload.image_config = imageConfig;
     }

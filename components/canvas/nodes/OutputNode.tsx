@@ -3,12 +3,15 @@
 import { memo, useCallback, useMemo } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useStudioStore } from "@/lib/store";
 import { HandleLabel } from "@/components/canvas/HandleLabel";
 
-function OutputNodeComponent({ id }: NodeProps) {
+function OutputNodeComponent({ id, data }: NodeProps) {
+  const updateNodeData = useStudioStore((s) => s.updateNodeData);
   const edges = useStudioStore((s) => s.edges);
   const nodeOutputs = useStudioStore((s) => s.nodeOutputs);
+  const nodeLabel = (data.label as string) || "Output";
 
   // Derive display values from upstream nodes only — no effect, no self-write
   const { text, imageUrl, videoUrl } = useMemo(() => {
@@ -48,8 +51,14 @@ function OutputNodeComponent({ id }: NodeProps) {
 
   return (
     <div className="min-w-[360px] max-w-[480px] rounded-lg border border-studio-node-border bg-studio-node shadow-lg relative">
-      <div className="rounded-t-lg bg-gray-600 px-3 py-1.5 text-xs font-semibold text-white">
-        Output
+      <div className="rounded-t-lg bg-gray-600 px-3 py-1.5 text-xs font-semibold text-white flex items-center justify-between gap-2">
+        <span>{nodeLabel}</span>
+        <Input
+          value={nodeLabel === "Output" ? "" : nodeLabel}
+          onChange={(e) => updateNodeData(id, { label: e.target.value || "Output" })}
+          placeholder="Label..."
+          className="h-5 w-24 border-0 bg-transparent px-1 text-[10px] text-right text-gray-200 placeholder:text-gray-300/60 focus-visible:ring-0"
+        />
       </div>
       <div className="p-3 space-y-2 nopan nodrag nowheel">
         {text && (
