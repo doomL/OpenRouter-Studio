@@ -15,16 +15,12 @@ export interface OpenRouterModel {
 }
 
 /**
- * OpenRouter expects `["image","text"]` for models like Gemini that emit both, and `["image"]`
- * for image-only models (e.g. some Flux routes). Wrong modalities often yield text-only responses.
+ * Always request only image output for image generation requests.
+ * Sending "text" in modalities allows models like Gemini to return a text-only
+ * fallback response (e.g. a hint or explanation) instead of generating an image.
  */
-export function modalitiesForImageRequest(outputModalities: string[] | undefined): string[] {
-  if (!outputModalities?.length) return ["image", "text"];
-  const hasImage = outputModalities.includes("image");
-  const hasText = outputModalities.includes("text");
-  if (hasImage && hasText) return ["image", "text"];
-  if (hasImage) return ["image"];
-  return ["image", "text"];
+export function modalitiesForImageRequest(_outputModalities: string[] | undefined): string[] {
+  return ["image"];
 }
 
 /**

@@ -4,15 +4,6 @@ import { prisma } from "@/lib/prisma";
 import { decryptApiKey, encryptApiKey } from "@/lib/studio-crypto";
 import type { Prisma } from "@/lib/generated/prisma/client";
 
-/** JWT can outlive the DB (e.g. fresh Docker volume); UserStudioState FK requires a real User row. */
-async function sessionUserExists(userId: string): Promise<boolean> {
-  const u = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { id: true },
-  });
-  return u != null;
-}
-
 function emptyPayload() {
   return {
     apiKey: "",
@@ -31,13 +22,20 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const userId = session.user.id;
-  if (!(await sessionUserExists(userId))) {
+
+  // Single query: verify user exists AND fetch studio state in one round-trip.
+  // JWT can outlive the DB (e.g. fresh Docker volume), so we check the User row exists.
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, studioState: true },
+  });
+  if (!user) {
     return NextResponse.json(
       { error: "Invalid session; sign in again." },
       { status: 401 }
     );
   }
-  const row = await prisma.userStudioState.findUnique({ where: { userId } });
+  const row = user.studioState;
   if (!row) {
     return NextResponse.json(emptyPayload());
   }
@@ -66,7 +64,12 @@ export async function PUT(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const userId = session.user.id;
-  if (!(await sessionUserExists(userId))) {
+  // Verify the user row still exists (JWT can outlive a fresh Docker volume).
+  const userExists = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true },
+  });
+  if (!userExists) {
     return NextResponse.json(
       { error: "Invalid session; sign in again." },
       { status: 401 }

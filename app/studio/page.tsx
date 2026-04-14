@@ -6,6 +6,7 @@ import { StudioCanvas } from "@/components/canvas/StudioCanvas";
 import { NodePanel } from "@/components/canvas/NodePanel";
 import { ApiKeyModal } from "@/components/ui/ApiKeyModal";
 import { SaveWorkflowDialog } from "@/components/ui/SaveWorkflowDialog";
+import { ExportWorkflowDialog } from "@/components/ui/ExportWorkflowDialog";
 import { ImportWorkflowErrorDialog } from "@/components/ui/ImportWorkflowErrorDialog";
 import { DeleteWorkflowConfirmDialog } from "@/components/ui/DeleteWorkflowConfirmDialog";
 import { Button } from "@/components/ui/button";
@@ -66,6 +67,7 @@ export default function StudioPage() {
 
   const [showApiKey, setShowApiKey] = useState(false);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [importErrorOpen, setImportErrorOpen] = useState(false);
   const [workflowToDelete, setWorkflowToDelete] = useState<{
     id: string;
@@ -109,16 +111,23 @@ export default function StudioPage() {
   );
 
   const handleExport = useCallback(() => {
-    const json = exportWorkflow();
-    const blob = new Blob([json], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "workflow.json";
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success("Workflow exported");
-  }, [exportWorkflow]);
+    setExportDialogOpen(true);
+  }, []);
+
+  const handleConfirmExport = useCallback(
+    (filename: string) => {
+      const json = exportWorkflow();
+      const blob = new Blob([json], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${filename}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("Workflow exported");
+    },
+    [exportWorkflow]
+  );
 
   const handleImport = useCallback(() => {
     fileInputRef.current?.click();
@@ -452,6 +461,11 @@ export default function StudioPage() {
           open={saveDialogOpen}
           onOpenChange={setSaveDialogOpen}
           onSave={handleConfirmSaveWorkflow}
+        />
+        <ExportWorkflowDialog
+          open={exportDialogOpen}
+          onOpenChange={setExportDialogOpen}
+          onExport={handleConfirmExport}
         />
         <ImportWorkflowErrorDialog
           open={importErrorOpen}
