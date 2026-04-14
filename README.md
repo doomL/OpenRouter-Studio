@@ -39,18 +39,22 @@
 | **Canvas** | Drag nodes from a palette, connect outputs to inputs, run one node or **Run all** in dependency order. |
 | **Models** | Anything OpenRouter exposes—chat, vision-capable models, image generators, video jobs (including alpha APIs where applicable). |
 | **Your key** | Bring your own OpenRouter API key; usage is billed by OpenRouter. The app proxies requests through your server so the key is not sent straight from the browser to `openrouter.ai`. |
-| **Accounts** | Sign up to sync **encrypted API key** (with `AUTH_SECRET`), **canvas**, **saved workflows**, **theme**, and **video job metadata** in SQLite—resume on another device. |
+| **Accounts** | Sign up to sync **encrypted API key** (with `AUTH_SECRET`), **canvas**, **saved workflows**, **theme**, and **video job metadata** in **PostgreSQL**—resume on another device. |
 | **Self-host** | Run locally or in Docker; export/import workflows as JSON for backups. |
 
 ---
 
 ## Quick start (local)
 
+You need a **PostgreSQL** instance and **`DATABASE_URL`** (see `.env.example`).
+
 ```bash
 npm install
 cp .env.example .env
-# Set AUTH_SECRET (e.g. openssl rand -base64 32) and NEXTAUTH_URL in .env
-npx prisma migrate dev   # creates SQLite DB for auth
+# Set AUTH_SECRET (e.g. openssl rand -base64 32). Optionally set NEXTAUTH_URL to match PORT.
+# Start Postgres (example: Compose service only) and align DATABASE_URL / POSTGRES_PASSWORD:
+docker compose up postgres -d
+npx prisma migrate dev   # applies migrations to the database in DATABASE_URL
 npm run dev
 ```
 
@@ -65,13 +69,15 @@ npm run build
 npm start
 ```
 
-Set **`NEXTAUTH_URL`** and **`AUTH_SECRET`** to match your public URL and a long random secret. `AUTH_SECRET` also encrypts stored OpenRouter keys in the database.
+Set **`DATABASE_URL`** to your PostgreSQL server, plus **`AUTH_SECRET`** and usually **`NEXTAUTH_URL`** to match your public URL. `AUTH_SECRET` also encrypts stored OpenRouter keys in the database.
+
+Prisma reads the migration URL from **`prisma.config.ts`** (typically the same `DATABASE_URL` env var). The app uses **`@prisma/adapter-pg`** at runtime.
 
 ---
 
 ## Docker
 
-Images use **Next.js standalone**. Each container start runs **`prisma migrate deploy`** (`docker-entrypoint.sh`) so the schema exists before `node server.js`. The process runs as **`nextjs`** with a writable `/app` for SQLite.
+Compose runs **PostgreSQL 16** (`postgres` service) and the **app** (`openrouter-studio`). Images use **Next.js standalone**. On each container start, **`docker-entrypoint.sh`** runs **`prisma migrate deploy`** so the schema exists before **`node server.js`**. The app process runs as **`nextjs`**.
 
 **1. Environment**
 
@@ -79,7 +85,9 @@ Images use **Next.js standalone**. Each container start runs **`prisma migrate d
 cp .env.example .env
 ```
 
-Minimum in **`.env`**: **`AUTH_SECRET`**, and usually **`NEXTAUTH_URL`** only when you need a fixed canonical URL. Compose sets **`DATABASE_URL=file:/app/data/studio.db`** and mounts a **named volume** on `/app/data`, so the SQLite database and accounts **persist across image rebuilds** and container recreation. To wipe data, run **`docker compose down -v`**.
+Minimum in **`.env`**: **`AUTH_SECRET`**. Compose sets **`DATABASE_URL`** for the app to `postgresql://studio:…@postgres:5432/openrouter_studio` (password from **`POSTGRES_PASSWORD`** in `.env`, default `studio_secret`). For local development against Compose Postgres from the host, use **`localhost:5432`** in **`DATABASE_URL`** as in `.env.example`.
+
+Database files live in the **`postgres-data`** named volume and **persist across image rebuilds** and container recreation. To wipe the database, run **`docker compose down -v`**.
 
 **2. Build and run**
 
@@ -110,7 +118,7 @@ Compose may load **`.env`**; it sets **`AUTH_TRUST_HOST=true`** for port mapping
 | Canvas | **@xyflow/react** (React Flow v12) |
 | State | **Zustand** (graph + UI; theme + sync via `/api/settings/studio` when signed in) |
 | Auth | **NextAuth.js v5**, **@auth/prisma-adapter** |
-| Database | **Prisma 7**, **SQLite**, **better-sqlite3** adapter |
+| Database | **Prisma 7**, **PostgreSQL**, **`pg`** via **`@prisma/adapter-pg`** |
 | Language | **TypeScript** |
 
 ---
