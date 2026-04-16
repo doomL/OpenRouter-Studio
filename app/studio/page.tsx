@@ -7,6 +7,7 @@ import { NodePanel } from "@/components/canvas/NodePanel";
 import { ApiKeyModal } from "@/components/ui/ApiKeyModal";
 import { SaveWorkflowDialog } from "@/components/ui/SaveWorkflowDialog";
 import { ExportWorkflowDialog } from "@/components/ui/ExportWorkflowDialog";
+import { ExportMediaZipDialog } from "@/components/ui/ExportMediaZipDialog";
 import { ImportWorkflowErrorDialog } from "@/components/ui/ImportWorkflowErrorDialog";
 import { DeleteWorkflowConfirmDialog } from "@/components/ui/DeleteWorkflowConfirmDialog";
 import { Button } from "@/components/ui/button";
@@ -43,7 +44,7 @@ import { getCanvasViewportFloatingProps } from "@/lib/canvas-floating-props";
 import { formatWorkflowSavedAt } from "@/lib/utils";
 import { ThemedLogo } from "@/components/theme/ThemedLogo";
 import { toast } from "@/lib/toast";
-import { buildStudioMediaZip } from "@/lib/studio-media-zip";
+import { buildStudioMediaZip, type StudioMediaZipOptions } from "@/lib/studio-media-zip";
 
 export default function StudioPage() {
   const cloudSyncReady = useStudioCloudSync();
@@ -68,6 +69,7 @@ export default function StudioPage() {
   const [showApiKey, setShowApiKey] = useState(false);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [exportMediaZipDialogOpen, setExportMediaZipDialogOpen] = useState(false);
   const [importErrorOpen, setImportErrorOpen] = useState(false);
   const [workflowToDelete, setWorkflowToDelete] = useState<{
     id: string;
@@ -133,7 +135,11 @@ export default function StudioPage() {
     fileInputRef.current?.click();
   }, []);
 
-  const handleDownloadAllMedia = useCallback(async () => {
+  const handleDownloadAllMedia = useCallback(() => {
+    setExportMediaZipDialogOpen(true);
+  }, []);
+
+  const handleConfirmDownloadAllMedia = useCallback(async (options: StudioMediaZipOptions) => {
     if (isDownloadingMediaZip) return;
     setIsDownloadingMediaZip(true);
     const key = useStudioStore.getState().apiKey ?? "";
@@ -144,7 +150,8 @@ export default function StudioPage() {
         useStudioStore.getState().edges,
         useStudioStore.getState().nodeOutputs,
         useStudioStore.getState().videoJobs,
-        key
+        key,
+        options
       );
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -401,7 +408,7 @@ export default function StudioPage() {
               variant="ghost"
               size="sm"
               className="h-7 text-xs gap-1"
-              onClick={() => void handleDownloadAllMedia()}
+              onClick={handleDownloadAllMedia}
               disabled={isDownloadingMediaZip}
               title="Download all images and videos as ZIP"
             >
@@ -485,6 +492,14 @@ export default function StudioPage() {
               toast.success(`Deleted “${name}”`);
             }
           }}
+        />
+        <ExportMediaZipDialog
+          open={exportMediaZipDialogOpen}
+          onOpenChange={setExportMediaZipDialogOpen}
+          onExport={(options) => {
+            void handleConfirmDownloadAllMedia(options);
+          }}
+          isExporting={isDownloadingMediaZip}
         />
       </div>
     </ReactFlowProvider>

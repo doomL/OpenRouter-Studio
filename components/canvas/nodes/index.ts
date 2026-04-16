@@ -58,7 +58,7 @@ export const nodeDefinitions = [
   {
     type: "videoGen",
     label: "Video Gen",
-    description: "Generate videos (alpha)",
+    description: "Generate videos",
     color: "bg-blue-700",
     icon: "clapperboard",
   },

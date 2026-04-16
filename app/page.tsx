@@ -142,7 +142,7 @@ export default function LandingPage() {
         <div className="relative mx-auto max-w-6xl px-6 pt-24 pb-20 text-center">
           <div className="inline-flex items-center gap-2 rounded-full border border-[#ff6b35]/30 bg-[#ff6b35]/10 px-4 py-1.5 text-xs text-[#c2410c] dark:text-[#ff9b70] mb-8">
             <ZapIcon className="size-3" />
-            Video generation now in alpha
+            Video generation available now
           </div>
 
           <h1 className="text-5xl sm:text-6xl font-extrabold tracking-tight leading-[1.1] max-w-3xl mx-auto text-foreground">

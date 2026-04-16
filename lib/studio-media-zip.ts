@@ -133,6 +133,20 @@ export interface BuildStudioMediaZipResult {
   fileCount: number;
 }
 
+export interface StudioMediaZipOptions {
+  includeInputNodes: boolean;
+  includeImageGenNodes: boolean;
+  includeVideoGenNodes: boolean;
+  includeOutputNodes: boolean;
+}
+
+const DEFAULT_STUDIO_MEDIA_ZIP_OPTIONS: StudioMediaZipOptions = {
+  includeInputNodes: true,
+  includeImageGenNodes: true,
+  includeVideoGenNodes: true,
+  includeOutputNodes: true,
+};
+
 /**
  * Collects images and videos from canvas nodes (inputs, generators, jobs, output previews)
  * and returns a single ZIP blob. Duplicate URLs are included once.
@@ -142,8 +156,13 @@ export async function buildStudioMediaZip(
   edges: Edge[],
   nodeOutputs: Record<string, NodeOutput>,
   videoJobs: Record<string, VideoJob>,
-  apiKey: string
+  apiKey: string,
+  options: Partial<StudioMediaZipOptions> = {}
 ): Promise<BuildStudioMediaZipResult> {
+  const resolvedOptions: StudioMediaZipOptions = {
+    ...DEFAULT_STUDIO_MEDIA_ZIP_OPTIONS,
+    ...options,
+  };
   const zip = new JSZip();
   const seen = new Set<string>();
   let index = 0;
@@ -189,6 +208,7 @@ export async function buildStudioMediaZip(
 
     switch (type) {
       case "imageInput": {
+        if (!resolvedOptions.includeInputNodes) break;
         const preview = (d.imagePreview || d.imageUrl) as string | undefined;
         await addUrl(preview, `${sid}-input`);
         if (out?.image_url) await addUrl(out.image_url, `${sid}-out`);
@@ -196,6 +216,7 @@ export async function buildStudioMediaZip(
         break;
       }
       case "mediaInput": {
+        if (!resolvedOptions.includeInputNodes) break;
         const mediaType = d.mediaType as string | undefined;
         if (mediaType === "image") {
           await addUrl(d.preview as string | undefined, `${sid}-media`);
@@ -211,17 +232,20 @@ export async function buildStudioMediaZip(
         break;
       }
       case "imageGen": {
+        if (!resolvedOptions.includeImageGenNodes) break;
         await addUrl(d.generatedImage as string | undefined, `${sid}-generated`);
         if (out?.image_url) await addUrl(out.image_url, `${sid}-out`);
         break;
       }
       case "videoGen": {
+        if (!resolvedOptions.includeVideoGenNodes) break;
         if (out?.video_url) await addUrl(out.video_url, `${sid}-video`);
         const job = videoJobs[node.id];
         await addUrl(job?.videoUrl, `${sid}-job-url`);
         break;
       }
       case "output": {
+        if (!resolvedOptions.includeOutputNodes) break;
         const { images, videos } = getOutputNodeUpstreamMedia(
           node.id,
           edges,
