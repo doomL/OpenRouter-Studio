@@ -10,7 +10,7 @@ export interface OpenRouterModel {
   /** Human-readable price label extracted from pricing_json for image/video models */
   priceLabel?: string;
   context_length?: number;
-  /** From OpenRouter `output_modalities` — used to pick correct image generation `modalities` */
+  /** From OpenRouter `output_modalities` — used to pick the correct canvas category */
   output_modalities?: string[];
 }
 
@@ -19,7 +19,7 @@ export interface OpenRouterModel {
  * Sending "text" in modalities allows models like Gemini to return a text-only
  * fallback response (e.g. a hint or explanation) instead of generating an image.
  */
-export function modalitiesForImageRequest(_outputModalities: string[] | undefined): string[] {
+export function modalitiesForImageRequest(): string[] {
   return ["image"];
 }
 
@@ -94,9 +94,11 @@ export function categorizeModels(models: Record<string, unknown>[]) {
   const text: OpenRouterModel[] = [];
   const image: OpenRouterModel[] = [];
   const video: OpenRouterModel[] = [];
+  const audio: OpenRouterModel[] = [];
 
   const seenImage = new Set<string>();
   const seenVideo = new Set<string>();
+  const seenAudio = new Set<string>();
 
   for (const raw of models) {
     const slug = (raw.slug as string) || "";
@@ -141,9 +143,14 @@ export function categorizeModels(models: Record<string, unknown>[]) {
       video.push(model);
       seenVideo.add(slug);
     }
+
+    if (outputMods.includes("audio") && !seenAudio.has(slug)) {
+      audio.push(model);
+      seenAudio.add(slug);
+    }
   }
 
-  return { text, image, video };
+  return { text, image, video, audio };
 }
 
 /**

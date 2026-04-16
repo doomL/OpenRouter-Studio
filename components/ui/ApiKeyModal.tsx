@@ -50,6 +50,7 @@ export function ApiKeyModal({ open, onOpenChange }: ApiKeyModalProps) {
         text?: Model[];
         image?: Model[];
         video?: Model[];
+        audio?: Model[];
       }>(res);
       if (data.error) {
         setStatus("error");
@@ -60,6 +61,7 @@ export function ApiKeyModal({ open, onOpenChange }: ApiKeyModalProps) {
           text: data.text ?? [],
           image: data.image ?? [],
           video: data.video ?? [],
+          audio: data.audio ?? [],
         });
         toast.success("Connection OK — models loaded");
       }

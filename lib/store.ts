@@ -21,6 +21,7 @@ export interface NodeOutput {
   image_url?: string;
   image_base64?: string;
   video_url?: string;
+  audio_url?: string;
   status: "idle" | "loading" | "done" | "error";
   error?: string;
 }
@@ -97,6 +98,7 @@ const HANDLE_TYPES: Record<string, string> = {
   image_url: "image",
   image_base64: "image",
   video_url: "video",
+  audio_url: "audio",
 };
 
 function getHandleType(handleId: string): string {
@@ -112,7 +114,7 @@ export function isValidConnection(sourceHandle: string, targetHandle: string): b
   const srcType = getHandleType(sourceHandle);
   const tgtType = getHandleType(targetHandle);
   if (srcType === "any" || tgtType === "any") return true;
-  // text→text, image→image, video→video
+  // text→text, image→image, video→video, audio→audio
   // Also allow text→prompt/system
   if (srcType === tgtType) return true;
   // Special: text source can connect to prompt/system targets
@@ -133,8 +135,8 @@ interface StudioState {
   setApiKey: (key: string) => void;
 
   // Models cache
-  models: { text: Model[]; image: Model[]; video: Model[] } | null;
-  setModels: (models: { text: Model[]; image: Model[]; video: Model[] }) => void;
+  models: { text: Model[]; image: Model[]; video: Model[]; audio: Model[] } | null;
+  setModels: (models: { text: Model[]; image: Model[]; video: Model[]; audio: Model[] }) => void;
 
   // Canvas
   nodes: Node[];

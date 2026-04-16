@@ -36,6 +36,9 @@ export function getNodeInputs(
     if (sourceHandle === "video_url") {
       inputs[targetHandle || "video_url"] = sourceOutput.video_url;
     }
+    if (sourceHandle === "audio_url") {
+      inputs[targetHandle || "audio_url"] = sourceOutput.audio_url;
+    }
   }
 
   return inputs;

@@ -8,6 +8,7 @@ import {
   BotIcon,
   PaletteIcon,
   ClapperboardIcon,
+  Volume2Icon,
   MonitorIcon,
   StickyNoteIcon,
 } from "lucide-react";
@@ -21,6 +22,7 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   bot: BotIcon,
   palette: PaletteIcon,
   clapperboard: ClapperboardIcon,
+  audio: Volume2Icon,
   monitor: MonitorIcon,
   stickyNote: StickyNoteIcon,
 };

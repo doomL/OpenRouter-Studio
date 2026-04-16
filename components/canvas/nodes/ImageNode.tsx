@@ -30,7 +30,6 @@ function ImageNodeComponent({ id, data }: NodeProps) {
   const nodes = useStudioStore((s) => s.nodes);
   const nodeOutputs = useStudioStore((s) => s.nodeOutputs);
   const apiKey = useStudioStore((s) => s.apiKey);
-  const models = useStudioStore((s) => s.models);
   const dynamicCount =
     useStudioStore((s) => s.dynamicHandleCounts[id]?.image_ref) || 1;
 
@@ -80,14 +79,13 @@ function ImageNodeComponent({ id, data }: NodeProps) {
       const imageRefs = getImageRefInputs(id, edges, nodeOutputs, nodes);
       const prompt = inputs.prompt || "";
 
-      const imageMeta = models?.image?.find((m) => m.id === model);
       const body: Record<string, unknown> = {
         model,
         prompt,
         mode,
         aspect_ratio: aspectRatio,
         image_size: imageSize,
-        modalities: modalitiesForImageRequest(imageMeta?.output_modalities),
+        modalities: modalitiesForImageRequest(),
       };
 
       const refUrls = imageRefs
@@ -199,7 +197,6 @@ function ImageNodeComponent({ id, data }: NodeProps) {
     id,
     model,
     apiKey,
-    models,
     edges,
     nodes,
     nodeOutputs,

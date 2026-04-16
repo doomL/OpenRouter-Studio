@@ -5,6 +5,7 @@ import { MediaInputNode } from "./MediaInputNode";
 import { LLMNode } from "./LLMNode";
 import { ImageNode } from "./ImageNode";
 import { VideoNode } from "./VideoNode";
+import { AudioNode } from "./AudioNode";
 import { OutputNode } from "./OutputNode";
 import { NoteNode } from "./NoteNode";
 
@@ -15,6 +16,7 @@ export const nodeTypes: NodeTypes = {
   llm: LLMNode,
   imageGen: ImageNode,
   videoGen: VideoNode,
+  audioGen: AudioNode,
   output: OutputNode,
   note: NoteNode,
 };
@@ -61,6 +63,13 @@ export const nodeDefinitions = [
     description: "Generate videos",
     color: "bg-blue-700",
     icon: "clapperboard",
+  },
+  {
+    type: "audioGen",
+    label: "Audio Gen",
+    description: "Generate speech or songs",
+    color: "bg-pink-700",
+    icon: "audio",
   },
   {
     type: "output",

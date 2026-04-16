@@ -14,11 +14,12 @@ function OutputNodeComponent({ id, data }: NodeProps) {
   const nodeLabel = (data.label as string) || "Output";
 
   // Derive display values from upstream nodes only — no effect, no self-write
-  const { text, imageUrl, videoUrl } = useMemo(() => {
+  const { text, imageUrl, videoUrl, audioUrl } = useMemo(() => {
     const incomingEdges = edges.filter((e) => e.target === id);
     let text: string | undefined;
     let imageUrl: string | undefined;
     let videoUrl: string | undefined;
+    let audioUrl: string | undefined;
 
     for (const edge of incomingEdges) {
       const src = nodeOutputs[edge.source];
@@ -35,8 +36,11 @@ function OutputNodeComponent({ id, data }: NodeProps) {
       if (th === "video_url" && src.video_url) {
         videoUrl = src.video_url;
       }
+      if (th === "audio_url" && src.audio_url) {
+        audioUrl = src.audio_url;
+      }
     }
-    return { text, imageUrl, videoUrl };
+    return { text, imageUrl, videoUrl, audioUrl };
   }, [id, edges, nodeOutputs]);
 
   const handleDownload = useCallback(
@@ -103,7 +107,21 @@ function OutputNodeComponent({ id, data }: NodeProps) {
           </div>
         )}
 
-        {!text && !imageUrl && !videoUrl && (
+        {audioUrl && (
+          <div className="space-y-1">
+            <audio controls src={audioUrl} className="w-full rounded" />
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-6 text-[10px] w-full"
+              onClick={() => handleDownload(audioUrl, "wav")}
+            >
+              Download Audio
+            </Button>
+          </div>
+        )}
+
+        {!text && !imageUrl && !videoUrl && !audioUrl && (
           <div className="py-8 text-center text-sm text-muted-foreground">
             Connect a node to see output
           </div>
@@ -121,6 +139,10 @@ function OutputNodeComponent({ id, data }: NodeProps) {
       <Handle type="target" position={Position.Left} id="video_url" style={{ top: "70%" }}
         className="!w-3 !h-3 !bg-blue-400 !border-2 !border-blue-600" />
       <HandleLabel label="video" side="left" top="70%" />
+
+      <Handle type="target" position={Position.Left} id="audio_url" style={{ top: "85%" }}
+        className="!w-3 !h-3 !bg-pink-400 !border-2 !border-pink-600" />
+      <HandleLabel label="audio" side="left" top="85%" />
     </div>
   );
 }
