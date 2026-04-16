@@ -1,6 +1,8 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { ThemedLogo } from "@/components/theme/ThemedLogo";
+import { auth } from "@/lib/auth";
 import {
   BotIcon,
   ImageIcon,
@@ -12,7 +14,12 @@ import {
   ArrowRightIcon,
   ServerIcon,
   CloudIcon,
+  Volume2Icon,
+  FolderArchiveIcon,
+  UploadIcon,
 } from "lucide-react";
+
+export const dynamic = "force-dynamic";
 
 const GITHUB_REPO = "https://github.com/doomL/OpenRouter-Studio";
 
@@ -39,6 +46,24 @@ const features = [
     icon: VideoIcon,
     title: "Video Generation",
     description: "Create videos with Veo 3.1, Sora 2, Seedance. Full control over duration, resolution, and audio.",
+  },
+  {
+    icon: Volume2Icon,
+    title: "Audio Generation",
+    description:
+      "Generate speech and other audio from models with audio output on OpenRouter — wire prompts or LLM text into an Audio Gen node.",
+  },
+  {
+    icon: UploadIcon,
+    title: "Image & Media Inputs",
+    description:
+      "Upload files or paste URLs for images and videos. Feed vision models, references, or frame-to-video workflows.",
+  },
+  {
+    icon: FolderArchiveIcon,
+    title: "Media ZIP Export",
+    description:
+      "Download canvas media as a ZIP with a dialog to pick what to include: inputs, image/video generators, and output previews.",
   },
   {
     icon: LayersIcon,
@@ -68,12 +93,12 @@ const plans = [
     ctaHref: GITHUB_REPO,
     highlight: false,
     features: [
-      "All node types (LLM, Image, Video)",
+      "All node types (LLM, Image, Video, Audio, inputs, output)",
       "Unlimited workflows",
       "Your own OpenRouter API key",
       "No data leaves your machine",
       "Community support",
-      "Open source (MIT)",
+      "Open source (Apache-2.0)",
     ],
   },
   {
@@ -96,7 +121,12 @@ const plans = [
   },
 ];
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  const session = await auth();
+  if (session?.user) {
+    redirect("/studio");
+  }
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* Nav */}
@@ -154,8 +184,9 @@ export default function LandingPage() {
           </h1>
 
           <p className="mt-6 text-lg text-muted-foreground max-w-xl mx-auto leading-relaxed">
-            A node-based canvas to chain LLMs, image generation, and video generation.
-            Connect to 300+ models through OpenRouter. No code required.
+            A node-based canvas to chain LLMs, image and audio generation, and video generation —
+            plus rich inputs, an output hub, and selective media export. Connect to hundreds of
+            models through OpenRouter. No code required.
           </p>
 
           <div className="mt-10 flex items-center justify-center gap-4 flex-wrap">
