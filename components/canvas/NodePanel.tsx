@@ -11,6 +11,7 @@ import {
   Volume2Icon,
   MonitorIcon,
   StickyNoteIcon,
+  ScissorsIcon,
 } from "lucide-react";
 import { nodeDefinitions } from "./nodes";
 import { useStudioStore } from "@/lib/store";
@@ -25,6 +26,7 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   audio: Volume2Icon,
   monitor: MonitorIcon,
   stickyNote: StickyNoteIcon,
+  scissors: ScissorsIcon,
 };
 
 export function NodePanel() {

@@ -4,6 +4,7 @@ import { ImageInputNode } from "./ImageInputNode";
 import { MediaInputNode } from "./MediaInputNode";
 import { LLMNode } from "./LLMNode";
 import { ImageNode } from "./ImageNode";
+import { BackgroundRemovalNode } from "./BackgroundRemovalNode";
 import { VideoNode } from "./VideoNode";
 import { AudioNode } from "./AudioNode";
 import { OutputNode } from "./OutputNode";
@@ -15,6 +16,7 @@ export const nodeTypes: NodeTypes = {
   mediaInput: MediaInputNode,
   llm: LLMNode,
   imageGen: ImageNode,
+  bgRemove: BackgroundRemovalNode,
   videoGen: VideoNode,
   audioGen: AudioNode,
   output: OutputNode,
@@ -56,6 +58,13 @@ export const nodeDefinitions = [
     description: "Generate images",
     color: "bg-orange-600",
     icon: "palette",
+  },
+  {
+    type: "bgRemove",
+    label: "BG Remove",
+    description: "Cut out image background",
+    color: "bg-emerald-700",
+    icon: "scissors",
   },
   {
     type: "videoGen",

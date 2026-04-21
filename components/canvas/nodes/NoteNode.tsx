@@ -56,8 +56,7 @@ function NoteNodeComponent({ id, data }: NodeProps) {
           onChange={(e) => handleTextChange(e.target.value)}
           placeholder="Add a note..."
           rows={4}
-          cols={24}
-          className="nodrag nopan nowheel min-h-[5rem] min-w-[200px] w-auto max-w-[min(100vw-2rem,90vw)] text-xs bg-transparent border-none focus-visible:ring-0 p-1"
+          className="nodrag nopan nowheel min-h-[5rem] w-full text-xs bg-transparent border-none focus-visible:ring-0 p-1"
         />
       </div>
     </div>
