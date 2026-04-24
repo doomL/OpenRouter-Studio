@@ -91,7 +91,7 @@ function VideoNodeComponent({ id, data }: NodeProps) {
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [elapsed, setElapsed] = useState(0);
 
-  // Restore output from persisted videoJob on mount
+  // Restore output from persisted videoJob when job / outputs change (not only first mount)
   useEffect(() => {
     if (videoJob?.status === "completed" && videoJob.jobId && !nodeOutput?.video_url) {
       const proxyUrl = `/api/openrouter/video/download?jobId=${videoJob.jobId}&index=0&key=${encodeURIComponent(apiKey)}`;
@@ -100,7 +100,7 @@ function VideoNodeComponent({ id, data }: NodeProps) {
         setVideoJob(id, { ...videoJob, videoUrl: proxyUrl });
       }
     }
-  }, []);
+  }, [apiKey, id, nodeOutput?.video_url, setNodeOutput, setVideoJob, videoJob]);
 
   const jobStatus = videoJob?.status || "idle";
   const isPolling = jobStatus === "pending" || jobStatus === "in_progress";

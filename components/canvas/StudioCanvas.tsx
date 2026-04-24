@@ -123,7 +123,18 @@ export function StudioCanvas() {
       });
 
       const id = `${type}-${Date.now()}`;
-      addNode({ id, type, position, data: {} });
+      addNode(
+        type === "freeText"
+          ? {
+              id,
+              type,
+              position,
+              data: {},
+              style: { width: 320, height: 120 },
+              className: "studio-node-freetext",
+            }
+          : { id, type, position, data: {} }
+      );
     },
     [addNode]
   );

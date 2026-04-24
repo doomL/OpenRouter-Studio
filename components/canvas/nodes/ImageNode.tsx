@@ -44,12 +44,13 @@ function ImageNodeComponent({ id, data }: NodeProps) {
   const font2Text = (data.font2Text as string) || "";
   const superResolutionRefsText = (data.superResolutionRefsText as string) || "";
 
-  // Restore output from persisted node data on mount
+  // Restore output from persisted node data (import / id reuse must re-run, not only mount)
+  const persistedImage = data.generatedImage as string | undefined;
   useEffect(() => {
-    if (data.generatedImage && !nodeOutput?.image_url) {
-      setNodeOutput(id, { image_url: data.generatedImage as string, status: "done" });
+    if (persistedImage && !nodeOutput?.image_url) {
+      setNodeOutput(id, { image_url: persistedImage, status: "done" });
     }
-  }, []);
+  }, [id, persistedImage, nodeOutput?.image_url, setNodeOutput]);
 
   const status = nodeOutput?.status || "idle";
   const borderColor =

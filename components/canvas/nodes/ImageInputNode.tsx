@@ -17,7 +17,8 @@ function ImageInputNodeComponent({ id, data }: NodeProps) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
 
-  const imagePreview = (data.imagePreview as string) || "";
+  const imagePreview =
+    (data.imagePreview as string) || (data.imageUrl as string) || "";
   const nodeLabel = (data.label as string) || "Image Input";
   const urlInput = (data.urlInput as string) || "";
 

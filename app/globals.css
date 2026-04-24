@@ -167,6 +167,14 @@
   pointer-events: none;
 }
 
+/* Floating label: no card-style selection halo (resize handles still show when selected) */
+.react-flow__node.studio-node-freetext.selected > div {
+  box-shadow: none;
+}
+.react-flow__node.studio-node-freetext.selected > div::after {
+  display: none;
+}
+
 /* React Flow: multi-select drag rectangle */
 .react-flow__selection {
   border: 1.5px dashed #3b82f6 !important;

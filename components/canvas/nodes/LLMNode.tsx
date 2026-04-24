@@ -29,12 +29,13 @@ function LLMNodeComponent({ id, data }: NodeProps) {
   const maxTokens = (data.maxTokens as number) ?? 1024;
   const nodeLabel = (data.label as string) || "LLM Chat";
 
-  // Restore output from persisted node data on mount
+  // Restore output from persisted node data (import / id reuse must re-run, not only mount)
+  const persistedText = data.generatedText as string | undefined;
   useEffect(() => {
-    if (data.generatedText && !nodeOutput?.text) {
-      setNodeOutput(id, { text: data.generatedText as string, status: "done" });
+    if (persistedText && !nodeOutput?.text) {
+      setNodeOutput(id, { text: persistedText, status: "done" });
     }
-  }, []);
+  }, [id, persistedText, nodeOutput?.text, setNodeOutput]);
 
   const status = nodeOutput?.status || "idle";
 

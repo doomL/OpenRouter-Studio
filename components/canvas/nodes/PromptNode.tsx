@@ -16,10 +16,10 @@ function PromptNodeComponent({ id, data }: NodeProps) {
   const systemPrompt = (data.systemPrompt as string) || "";
   const nodeLabel = (data.label as string) || "Prompt";
 
-  // Sync output on mount (covers page refresh / workflow load)
+  // Sync outputs when workflow data changes (import / refresh / same node id, new graph)
   useEffect(() => {
     setNodeOutput(id, { text: prompt, system: systemPrompt, status: "done" });
-  }, []);
+  }, [id, prompt, systemPrompt, setNodeOutput]);
 
   const handlePromptChange = useCallback(
     (value: string) => {

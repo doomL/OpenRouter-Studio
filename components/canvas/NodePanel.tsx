@@ -10,6 +10,7 @@ import {
   ClapperboardIcon,
   Volume2Icon,
   MonitorIcon,
+  Type,
   StickyNoteIcon,
   ScissorsIcon,
 } from "lucide-react";
@@ -25,6 +26,7 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   clapperboard: ClapperboardIcon,
   audio: Volume2Icon,
   monitor: MonitorIcon,
+  type: Type,
   stickyNote: StickyNoteIcon,
   scissors: ScissorsIcon,
 };
@@ -45,12 +47,23 @@ export function NodePanel() {
     (nodeType: string) => {
       const id = `${nodeType}-${Date.now()}`;
       const offset = nodes.length * 20;
-      addNode({
-        id,
-        type: nodeType,
-        position: { x: 250 + offset, y: 150 + offset },
-        data: {},
-      });
+      addNode(
+        nodeType === "freeText"
+          ? {
+              id,
+              type: nodeType,
+              position: { x: 250 + offset, y: 150 + offset },
+              data: {},
+              style: { width: 320, height: 120 },
+              className: "studio-node-freetext",
+            }
+          : {
+              id,
+              type: nodeType,
+              position: { x: 250 + offset, y: 150 + offset },
+              data: {},
+            }
+      );
     },
     [addNode, nodes.length]
   );

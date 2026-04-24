@@ -9,6 +9,7 @@ import { VideoNode } from "./VideoNode";
 import { AudioNode } from "./AudioNode";
 import { OutputNode } from "./OutputNode";
 import { NoteNode } from "./NoteNode";
+import { FreeTextNode } from "./FreeTextNode";
 
 export const nodeTypes: NodeTypes = {
   prompt: PromptNode,
@@ -21,6 +22,7 @@ export const nodeTypes: NodeTypes = {
   audioGen: AudioNode,
   output: OutputNode,
   note: NoteNode,
+  freeText: FreeTextNode,
 };
 
 export const nodeDefinitions = [
@@ -90,8 +92,15 @@ export const nodeDefinitions = [
   {
     type: "note",
     label: "Note",
-    description: "Canvas annotation",
+    description: "Sticky note on the canvas",
     color: "bg-yellow-600",
     icon: "stickyNote",
+  },
+  {
+    type: "freeText",
+    label: "Label",
+    description: "Plain text; handles scale font size",
+    color: "bg-slate-600",
+    icon: "type",
   },
 ];

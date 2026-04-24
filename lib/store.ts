@@ -63,6 +63,13 @@ export type StudioNodesFragment = {
   >;
 };
 
+/** Ensures transparent label nodes get selection styling without the default node halo. */
+function normalizeFreeTextNodes(nodes: Node[]): Node[] {
+  return nodes.map((n) =>
+    n.type === "freeText" ? { ...n, className: "studio-node-freetext" } : n
+  );
+}
+
 export function parseStudioNodeClipboard(text: string): StudioNodesFragment | null {
   try {
     const o = JSON.parse(text) as Record<string, unknown>;
@@ -300,7 +307,11 @@ export const useStudioStore = create<StudioState>()(
           selected: false,
           data: { ...node.data },
         };
-        set({ nodes: [...get().nodes, clone] });
+        const next =
+          clone.type === "freeText"
+            ? { ...clone, className: "studio-node-freetext" }
+            : clone;
+        set({ nodes: [...get().nodes, next] });
       },
       buildSelectedNodesClipboardPayload: () => {
         const { nodes, edges, dynamicHandleCounts } = get();
@@ -370,7 +381,7 @@ export const useStudioStore = create<StudioState>()(
           }
         }
         set({
-          nodes: [...existingNodes, ...newNodes],
+          nodes: [...existingNodes, ...normalizeFreeTextNodes(newNodes)],
           edges: [...get().edges, ...newEdges],
           dynamicHandleCounts: newDynamic,
         });
@@ -417,10 +428,11 @@ export const useStudioStore = create<StudioState>()(
         const workflow = get().workflows.find((w) => w.id === id);
         if (workflow) {
           set({
-            nodes: workflow.nodes,
+            nodes: normalizeFreeTextNodes(workflow.nodes),
             edges: workflow.edges,
             nodeOutputs: {},
             dynamicHandleCounts: rebuildDynamicHandleCountsFromEdges(workflow.edges),
+            videoJobs: {},
           });
         }
       },
@@ -444,10 +456,11 @@ export const useStudioStore = create<StudioState>()(
           if (!data.nodes || !data.edges) return false;
           get().pushHistory();
           set({
-            nodes: data.nodes,
+            nodes: normalizeFreeTextNodes(data.nodes as Node[]),
             edges: data.edges,
             nodeOutputs: {},
             dynamicHandleCounts: rebuildDynamicHandleCountsFromEdges(data.edges),
+            videoJobs: {},
           });
           return true;
         } catch {
@@ -541,7 +554,9 @@ export const useStudioStore = create<StudioState>()(
           payload.theme === "light" || payload.theme === "dark"
             ? payload.theme
             : "dark";
-        const nodes = Array.isArray(payload.nodes) ? payload.nodes : [];
+        const nodes = normalizeFreeTextNodes(
+          Array.isArray(payload.nodes) ? (payload.nodes as Node[]) : []
+        );
         const edges = Array.isArray(payload.edges) ? payload.edges : [];
         const fromEdges = rebuildDynamicHandleCountsFromEdges(edges);
         const fromPayload =
