@@ -1,6 +1,14 @@
 "use client";
 
-import { memo, useCallback, useEffect, useRef, useState } from "react";
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
 import {
   NodeResizer,
   useUpdateNodeInternals,
@@ -15,15 +23,32 @@ function clampFont(n: number) {
   return Math.min(FONT_MAX, Math.max(FONT_MIN, Math.round(n)));
 }
 
+function readStyleDim(
+  style: CSSProperties | undefined,
+  key: "width" | "height"
+): number | undefined {
+  if (!style) return undefined;
+  const v = style[key];
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (typeof v === "string") {
+    const n = parseFloat(v.replace(/px$/i, ""));
+    return Number.isFinite(n) ? n : undefined;
+  }
+  return undefined;
+}
+
 /** Plain canvas text: resize handles scale font size; node snaps to content after resize. */
 function FreeTextNodeComponent({ id, data, selected }: NodeProps) {
   const updateNodeData = useStudioStore((s) => s.updateNodeData);
+  const setNodes = useStudioStore((s) => s.setNodes);
   const updateNodeInternals = useUpdateNodeInternals();
 
   const text = (data.text as string) || "";
   const fontSize = clampFont(Number(data.fontSize) || 18);
 
   const editorRef = useRef<HTMLDivElement>(null);
+  const shellRef = useRef<HTMLDivElement>(null);
+  const resizingRef = useRef(false);
   const resizeStartRef = useRef({ w: 1, h: 1, fs: fontSize });
   const [focused, setFocused] = useState(false);
 
@@ -36,6 +61,55 @@ function FreeTextNodeComponent({ id, data, selected }: NodeProps) {
     }
   }, [text]);
 
+  const syncShellToNodeSize = useCallback(() => {
+    if (resizingRef.current) return;
+    const el = shellRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const nextW = Math.max(48, Math.ceil(rect.width));
+    const nextH = Math.max(24, Math.ceil(rect.height));
+
+    const { nodes } = useStudioStore.getState();
+    const node = nodes.find((n) => n.id === id);
+    if (!node) return;
+
+    const prevW = readStyleDim(node.style, "width");
+    const prevH = readStyleDim(node.style, "height");
+    const same =
+      prevW !== undefined &&
+      prevH !== undefined &&
+      Math.abs(prevW - nextW) < 1 &&
+      Math.abs(prevH - nextH) < 1;
+    if (same) return;
+
+    setNodes(
+      nodes.map((n) =>
+        n.id === id
+          ? {
+              ...n,
+              style: {
+                ...n.style,
+                width: nextW,
+                height: nextH,
+              },
+            }
+          : n
+      )
+    );
+    updateNodeInternals(id);
+  }, [id, setNodes, updateNodeInternals]);
+
+  useLayoutEffect(() => {
+    const el = shellRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => {
+      syncShellToNodeSize();
+    });
+    ro.observe(el);
+    syncShellToNodeSize();
+    return () => ro.disconnect();
+  }, [syncShellToNodeSize]);
+
   const readFontFromStore = useCallback(() => {
     const node = useStudioStore.getState().nodes.find((n) => n.id === id);
     const raw = (node?.data as Record<string, unknown> | undefined)?.fontSize;
@@ -44,6 +118,7 @@ function FreeTextNodeComponent({ id, data, selected }: NodeProps) {
 
   const onResizeStart = useCallback(
     (_: unknown, params: { width: number; height: number }) => {
+      resizingRef.current = true;
       resizeStartRef.current = {
         w: Math.max(1, params.width),
         h: Math.max(1, params.height),
@@ -78,8 +153,12 @@ function FreeTextNodeComponent({ id, data, selected }: NodeProps) {
         return { ...n, style };
       })
     );
-    requestAnimationFrame(() => updateNodeInternals(id));
-  }, [id, updateNodeInternals]);
+    resizingRef.current = false;
+    requestAnimationFrame(() => {
+      updateNodeInternals(id);
+      syncShellToNodeSize();
+    });
+  }, [id, syncShellToNodeSize, updateNodeInternals]);
 
   return (
     <>
@@ -93,7 +172,10 @@ function FreeTextNodeComponent({ id, data, selected }: NodeProps) {
         onResize={onResize}
         onResizeEnd={onResizeEnd}
       />
-      <div className="relative inline-flex max-w-[min(100vw-2rem,96vw)] bg-transparent">
+      <div
+        ref={shellRef}
+        className="relative inline-flex max-w-[min(100vw-2rem,96vw)] bg-transparent"
+      >
         {!text && !focused && (
           <span
             className="pointer-events-none absolute inset-0 select-none text-muted-foreground/55"
@@ -109,7 +191,7 @@ function FreeTextNodeComponent({ id, data, selected }: NodeProps) {
         )}
         <div
           ref={editorRef}
-          className="studio-freetext-editable nodrag nopan relative z-10 min-h-[1.2em] min-w-[2ch] max-w-full cursor-text whitespace-pre-wrap break-words text-foreground outline-none"
+          className="studio-freetext-editable nodrag nopan relative z-10 min-h-[1.2em] min-w-[2ch] max-w-[min(100vw-2rem,96vw)] cursor-text whitespace-pre-wrap break-words text-foreground outline-none"
           contentEditable
           suppressContentEditableWarning
           style={{

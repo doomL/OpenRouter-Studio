@@ -93,24 +93,30 @@ function VideoNodeComponent({ id, data }: NodeProps) {
 
   // Restore output from persisted videoJob when job / outputs change (not only first mount)
   useEffect(() => {
-    if (videoJob?.status === "completed" && videoJob.jobId && !nodeOutput?.video_url) {
+    if (
+      videoJob?.status === "completed" &&
+      videoJob.jobId &&
+      !nodeOutput?.video_url &&
+      nodeOutput?.status !== "loading"
+    ) {
       const proxyUrl = `/api/openrouter/video/download?jobId=${videoJob.jobId}&index=0&key=${encodeURIComponent(apiKey)}`;
       setNodeOutput(id, { video_url: proxyUrl, status: "done" });
       if (videoJob.videoUrl?.startsWith("http")) {
         setVideoJob(id, { ...videoJob, videoUrl: proxyUrl });
       }
     }
-  }, [apiKey, id, nodeOutput?.video_url, setNodeOutput, setVideoJob, videoJob]);
+  }, [apiKey, id, nodeOutput?.video_url, nodeOutput?.status, setNodeOutput, setVideoJob, videoJob]);
 
   const jobStatus = videoJob?.status || "idle";
   const isPolling = jobStatus === "pending" || jobStatus === "in_progress";
+  const showGenerating = isPolling || nodeOutput?.status === "loading";
 
-  const borderColor = isPolling
+  const borderColor = showGenerating
     ? "border-yellow-500 animate-pulse"
+    : nodeOutput?.status === "error" || jobStatus === "failed"
+    ? "border-red-500"
     : jobStatus === "completed"
     ? "border-green-500"
-    : jobStatus === "failed"
-    ? "border-red-500"
     : "border-studio-node-border";
 
   const connectedCharRefs = useMemo(() => {
@@ -160,6 +166,7 @@ function VideoNodeComponent({ id, data }: NodeProps) {
             error: result.error || "Generation failed",
           });
           setNodeOutput(id, {
+            ...useStudioStore.getState().nodeOutputs[id],
             status: "error",
             error: result.error || "Generation failed",
           });
@@ -180,7 +187,11 @@ function VideoNodeComponent({ id, data }: NodeProps) {
 
   const generate = useCallback(async () => {
     if (!model || !apiKey) return;
-    setNodeOutput(id, { status: "loading" });
+    setNodeOutput(id, {
+      ...nodeOutputs[id],
+      status: "loading",
+      error: undefined,
+    });
 
     try {
       const inputs = getNodeInputs(id, edges, nodeOutputs);
@@ -191,7 +202,11 @@ function VideoNodeComponent({ id, data }: NodeProps) {
       } catch (e) {
         const msg =
           e instanceof Error ? e.message : "Could not extract video frame";
-        setNodeOutput(id, { status: "error", error: msg });
+        setNodeOutput(id, {
+          ...useStudioStore.getState().nodeOutputs[id],
+          status: "error",
+          error: msg,
+        });
         return;
       }
       const imageRefsMerged = [...imageRefs, ...videoFrameRefs];
@@ -288,11 +303,18 @@ function VideoNodeComponent({ id, data }: NodeProps) {
         status: "pending",
         startedAt: Date.now(),
       });
-      setNodeOutput(id, { status: "loading" });
+      setNodeOutput(id, {
+        ...useStudioStore.getState().nodeOutputs[id],
+        status: "loading",
+      });
       setElapsed(0);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Unknown error";
-      setNodeOutput(id, { status: "error", error: msg });
+      setNodeOutput(id, {
+        ...useStudioStore.getState().nodeOutputs[id],
+        status: "error",
+        error: msg,
+      });
     }
   }, [
     id,

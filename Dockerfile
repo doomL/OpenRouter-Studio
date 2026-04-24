@@ -9,33 +9,25 @@ FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-# Prisma 7 reads `DATABASE_URL` from the environment for `prisma.config.ts`; Next may import the
-# client during `next build`. Compose only sets the real URL at runtime, so use a placeholder here.
 ARG DATABASE_URL=postgresql://build:build@127.0.0.1:5432/build
 ENV DATABASE_URL=$DATABASE_URL
-# Generated client is gitignored; must exist before `next build` (imports `@/lib/generated/prisma/client`)
 RUN npx prisma generate && npm run build
 
 FROM base AS runner
 WORKDIR /app
 ENV NODE_ENV=production
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
-COPY --from=builder /app/public ./public
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 nextjs
+RUN apk add --no-cache su-exec
+RUN npm install prisma@7.5.0 --prefix /app --no-save && \
+    chown -R nextjs:nodejs /app/node_modules
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 COPY --from=builder --chown=nextjs:nodejs /app/prisma.config.ts ./prisma.config.ts
-# Prisma CLI for `migrate deploy` at container start (not included in Next standalone bundle)
-USER root
-RUN npm install prisma@7.5.0 --prefix /app --no-save
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
-# su-exec: drop root → nextjs after fixing permissions on Docker volume mounts
-RUN apk add --no-cache su-exec
-# Standalone trace can copy the repo under /app; SQLite + Prisma need a writable tree
-RUN chown -R nextjs:nodejs /app
-# Entrypoint starts as root, chowns /app/data, then re-execs as nextjs
 USER root
 EXPOSE 3000
 ENV PORT=3000

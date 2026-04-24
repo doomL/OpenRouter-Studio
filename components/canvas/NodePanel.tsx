@@ -54,7 +54,7 @@ export function NodePanel() {
               type: nodeType,
               position: { x: 250 + offset, y: 150 + offset },
               data: {},
-              style: { width: 320, height: 120 },
+              style: { width: 48, height: 24 },
               className: "studio-node-freetext",
             }
           : {

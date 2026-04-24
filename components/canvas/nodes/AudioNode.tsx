@@ -45,7 +45,11 @@ function AudioNodeComponent({ id, data }: NodeProps) {
   const format = (data.format as string) || "wav";
 
   useEffect(() => {
-    if ((data.generatedAudio || data.generatedTranscript) && !nodeOutput?.audio_url) {
+    if (
+      (data.generatedAudio || data.generatedTranscript) &&
+      !nodeOutput?.audio_url &&
+      nodeOutput?.status !== "loading"
+    ) {
       setNodeOutput(id, {
         audio_url: (data.generatedAudio as string) || undefined,
         text: (data.generatedTranscript as string) || undefined,
@@ -57,6 +61,7 @@ function AudioNodeComponent({ id, data }: NodeProps) {
     data.generatedTranscript,
     id,
     nodeOutput?.audio_url,
+    nodeOutput?.status,
     setNodeOutput,
   ]);
 
@@ -72,7 +77,11 @@ function AudioNodeComponent({ id, data }: NodeProps) {
 
   const generate = useCallback(async () => {
     if (!model || !apiKey) return;
-    setNodeOutput(id, { status: "loading" });
+    setNodeOutput(id, {
+      ...nodeOutputs[id],
+      status: "loading",
+      error: undefined,
+    });
 
     try {
       const inputs = getNodeInputs(id, edges, nodeOutputs);
@@ -146,7 +155,11 @@ function AudioNodeComponent({ id, data }: NodeProps) {
       });
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Unknown error";
-      setNodeOutput(id, { status: "error", error: msg });
+      setNodeOutput(id, {
+        ...useStudioStore.getState().nodeOutputs[id],
+        status: "error",
+        error: msg,
+      });
     }
   }, [id, model, apiKey, edges, nodeOutputs, voice, format, setNodeOutput, updateNodeData]);
 

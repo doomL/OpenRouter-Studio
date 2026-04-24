@@ -32,10 +32,14 @@ function LLMNodeComponent({ id, data }: NodeProps) {
   // Restore output from persisted node data (import / id reuse must re-run, not only mount)
   const persistedText = data.generatedText as string | undefined;
   useEffect(() => {
-    if (persistedText && !nodeOutput?.text) {
+    if (
+      persistedText &&
+      !nodeOutput?.text &&
+      nodeOutput?.status !== "loading"
+    ) {
       setNodeOutput(id, { text: persistedText, status: "done" });
     }
-  }, [id, persistedText, nodeOutput?.text, setNodeOutput]);
+  }, [id, persistedText, nodeOutput?.text, nodeOutput?.status, setNodeOutput]);
 
   const status = nodeOutput?.status || "idle";
 
@@ -50,7 +54,11 @@ function LLMNodeComponent({ id, data }: NodeProps) {
 
   const run = useCallback(async () => {
     if (!model || !apiKey) return;
-    setNodeOutput(id, { status: "loading" });
+    setNodeOutput(id, {
+      ...nodeOutputs[id],
+      status: "loading",
+      error: undefined,
+    });
 
     try {
       const inputs = getNodeInputs(id, edges, nodeOutputs);
@@ -134,7 +142,11 @@ function LLMNodeComponent({ id, data }: NodeProps) {
       setNodeOutput(id, { text, status: "done" });
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Unknown error";
-      setNodeOutput(id, { status: "error", error: msg });
+      setNodeOutput(id, {
+        ...useStudioStore.getState().nodeOutputs[id],
+        status: "error",
+        error: msg,
+      });
     }
   }, [
     id,

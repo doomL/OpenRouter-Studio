@@ -149,7 +149,11 @@ function BackgroundRemovalNodeComponent({ id, data }: NodeProps) {
       return;
     }
 
-    setNodeOutput(id, { status: "loading" });
+    setNodeOutput(id, {
+      ...nodeOutputs[id],
+      status: "loading",
+      error: undefined,
+    });
     try {
       const basePrompt = (inputs.prompt || instruction || DEFAULT_PROMPT).trim();
       const prompt = `${basePrompt}\nUse this exact background color: ${keyColor}.`;
@@ -218,7 +222,11 @@ function BackgroundRemovalNodeComponent({ id, data }: NodeProps) {
       setNodeOutput(id, { image_url: finalUrl, status: "done" });
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Unknown error";
-      setNodeOutput(id, { status: "error", error: msg });
+      setNodeOutput(id, {
+        ...useStudioStore.getState().nodeOutputs[id],
+        status: "error",
+        error: msg,
+      });
     }
   }, [
     model,

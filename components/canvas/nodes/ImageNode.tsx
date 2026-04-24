@@ -47,10 +47,14 @@ function ImageNodeComponent({ id, data }: NodeProps) {
   // Restore output from persisted node data (import / id reuse must re-run, not only mount)
   const persistedImage = data.generatedImage as string | undefined;
   useEffect(() => {
-    if (persistedImage && !nodeOutput?.image_url) {
+    if (
+      persistedImage &&
+      !nodeOutput?.image_url &&
+      nodeOutput?.status !== "loading"
+    ) {
       setNodeOutput(id, { image_url: persistedImage, status: "done" });
     }
-  }, [id, persistedImage, nodeOutput?.image_url, setNodeOutput]);
+  }, [id, persistedImage, nodeOutput?.image_url, nodeOutput?.status, setNodeOutput]);
 
   const status = nodeOutput?.status || "idle";
   const borderColor =
@@ -73,7 +77,11 @@ function ImageNodeComponent({ id, data }: NodeProps) {
 
   const generate = useCallback(async () => {
     if (!model || !apiKey) return;
-    setNodeOutput(id, { status: "loading" });
+    setNodeOutput(id, {
+      ...nodeOutputs[id],
+      status: "loading",
+      error: undefined,
+    });
 
     try {
       const inputs = getNodeInputs(id, edges, nodeOutputs);
@@ -192,7 +200,11 @@ function ImageNodeComponent({ id, data }: NodeProps) {
       setNodeOutput(id, { image_url: finalUrl, status: "done" });
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Unknown error";
-      setNodeOutput(id, { status: "error", error: msg });
+      setNodeOutput(id, {
+        ...useStudioStore.getState().nodeOutputs[id],
+        status: "error",
+        error: msg,
+      });
     }
   }, [
     id,
