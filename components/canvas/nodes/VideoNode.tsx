@@ -22,6 +22,7 @@ import { ModelSelector } from "@/components/ui/ModelSelector";
 import { AlertTriangleIcon, ClockIcon, Volume2Icon, VolumeXIcon } from "lucide-react";
 import { HandleLabel } from "@/components/canvas/HandleLabel";
 import { getCanvasSelectContentProps } from "@/lib/canvas-floating-props";
+import { StudioMultiImageRefHint } from "@/lib/studio-multi-image-ref-hint";
 
 /** Per-model supported parameters from the docs */
 const MODEL_PARAMS: Record<string, {
@@ -194,7 +195,7 @@ function VideoNodeComponent({ id, data }: NodeProps) {
     });
 
     try {
-      const inputs = getNodeInputs(id, edges, nodeOutputs);
+      const inputs = getNodeInputs(id, edges, nodeOutputs, nodes);
       const imageRefs = getImageRefInputs(id, edges, nodeOutputs, nodes);
       let videoFrameRefs: Array<{ handle: string; url: string }> = [];
       try {
@@ -489,12 +490,15 @@ function VideoNodeComponent({ id, data }: NodeProps) {
           </div>
         )}
 
-        <p className="text-[9px] text-muted-foreground leading-snug border-t border-studio-node-border pt-2">
-          Connect another node&apos;s <span className="text-foreground/90">video out</span> to{" "}
-          <span className="text-foreground/90">first frame</span> or{" "}
-          <span className="text-foreground/90">last frame</span> to extend the clip (frames are
-          captured in your browser).
-        </p>
+        <div className="space-y-1.5 border-t border-studio-node-border pt-2">
+          <StudioMultiImageRefHint className="text-[9px] text-muted-foreground leading-snug" />
+          <p className="text-[9px] text-muted-foreground leading-snug">
+            Connect another node&apos;s <span className="text-foreground/90">video out</span> to{" "}
+            <span className="text-foreground/90">first frame</span> or{" "}
+            <span className="text-foreground/90">last frame</span> to extend the clip (frames are
+            captured in your browser).
+          </p>
+        </div>
 
         <Button
           size="sm"

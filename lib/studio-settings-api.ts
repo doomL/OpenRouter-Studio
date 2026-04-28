@@ -1,4 +1,6 @@
-import { useStudioStore } from "@/lib/store";
+import type { Node } from "@xyflow/react";
+import { readJsonResponse } from "@/lib/read-json-response";
+import { useStudioStore, type Workflow } from "@/lib/store";
 
 /** Body shape for PUT /api/settings/studio */
 export function getStudioSettingsPayload(overrides?: Partial<{ apiKey: string }>) {
@@ -30,6 +32,23 @@ export async function saveStudioSettingsToServer(
     if (res.status === 401 && typeof window !== "undefined") {
       const { signOutAtCurrentOrigin } = await import("@/lib/studio-sign-out");
       void signOutAtCurrentOrigin("/auth/login");
+    }
+    if (res.ok) {
+      try {
+        const body = await readJsonResponse<{
+          ok?: boolean;
+          nodes?: unknown;
+          workflows?: unknown;
+        }>(res.clone());
+        if (Array.isArray(body.nodes) && Array.isArray(body.workflows)) {
+          useStudioStore.getState().applyPersistedServerStudioGraph(
+            body.nodes as Node[],
+            body.workflows as Workflow[]
+          );
+        }
+      } catch {
+        // Malformed or non-JSON body — ignore
+      }
     }
     return res;
   } catch {

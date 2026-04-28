@@ -1,22 +1,35 @@
 import { type Edge, type Node } from "@xyflow/react";
+import { pickInlineOrBlobUrl } from "@/lib/studio-node-media-url";
 
-/** Image URL from `node.data` when `nodeOutputs` is empty (e.g. after workflow import). */
+/** Image URL from `node.data` when `nodeOutputs` is empty (e.g. after workflow import / cloud sync). */
 export function imageUrlFromPersistedNodeData(node: Node | undefined): string | undefined {
   if (!node) return undefined;
   const d = node.data as Record<string, unknown>;
   switch (node.type) {
     case "imageInput": {
-      const u = (d.imageUrl as string) || (d.imagePreview as string);
-      return u?.length ? u : undefined;
+      return (
+        pickInlineOrBlobUrl(
+          (d.imagePreview as string) || undefined,
+          d.imagePreviewBlobId as string | undefined
+        ) ||
+        pickInlineOrBlobUrl(
+          (d.imageUrl as string) || undefined,
+          d.imageUrlBlobId as string | undefined
+        )
+      );
     }
     case "mediaInput": {
       if (d.mediaType !== "image") return undefined;
-      const p = d.preview as string;
-      return p?.length ? p : undefined;
+      return pickInlineOrBlobUrl(
+        d.preview as string | undefined,
+        d.previewBlobId as string | undefined
+      );
     }
     case "imageGen": {
-      const g = d.generatedImage as string;
-      return g?.length ? g : undefined;
+      return pickInlineOrBlobUrl(
+        d.generatedImage as string | undefined,
+        d.generatedImageBlobId as string | undefined
+      );
     }
     default:
       return undefined;

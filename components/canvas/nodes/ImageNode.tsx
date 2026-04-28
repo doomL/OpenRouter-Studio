@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useCallback, useEffect, useMemo } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,21 +14,29 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useStudioStore } from "@/lib/store";
-import { getNodeInputs, getImageRefInputs } from "@/lib/execution";
+import { getNodeInputs, getImageRefInputs, imageRefSourcesSignature } from "@/lib/execution";
 import { ModelSelector } from "@/components/ui/ModelSelector";
 import { HandleLabel } from "@/components/canvas/HandleLabel";
 import { getCanvasSelectContentProps } from "@/lib/canvas-floating-props";
 import { modalitiesForImageRequest } from "@/lib/models";
 import { readJsonResponse } from "@/lib/read-json-response";
 import { fetchWithRetry, STUDIO_FETCH_MAX_ATTEMPTS } from "@/lib/fetch-with-retry";
+import { NodeMediaHistoryButton } from "@/components/studio/NodeMediaHistoryButton";
+import { pickInlineOrBlobUrl, studioBlobFetchUrl } from "@/lib/studio-node-media-url";
+import { downloadImageFromSrc } from "@/lib/studio-download-image";
+import { StudioMultiImageRefHint } from "@/lib/studio-multi-image-ref-hint";
+import { toast } from "@/lib/toast";
+import { DownloadIcon } from "lucide-react";
 
 function ImageNodeComponent({ id, data }: NodeProps) {
   const updateNodeData = useStudioStore((s) => s.updateNodeData);
   const setNodeOutput = useStudioStore((s) => s.setNodeOutput);
   const nodeOutput = useStudioStore((s) => s.nodeOutputs[id]);
   const edges = useStudioStore((s) => s.edges);
-  const nodes = useStudioStore((s) => s.nodes);
-  const nodeOutputs = useStudioStore((s) => s.nodeOutputs);
+  /** Only recompute ref thumbnails when upstream image outputs / persisted media actually change. */
+  const upstreamImageSig = useStudioStore((s) =>
+    imageRefSourcesSignature(id, s.edges, s.nodeOutputs, s.nodes)
+  );
   const apiKey = useStudioStore((s) => s.apiKey);
   const dynamicCount =
     useStudioStore((s) => s.dynamicHandleCounts[id]?.image_ref) || 1;
@@ -45,7 +53,10 @@ function ImageNodeComponent({ id, data }: NodeProps) {
   const superResolutionRefsText = (data.superResolutionRefsText as string) || "";
 
   // Restore output from persisted node data (import / id reuse must re-run, not only mount)
-  const persistedImage = data.generatedImage as string | undefined;
+  const persistedImage = pickInlineOrBlobUrl(
+    data.generatedImage as string | undefined,
+    data.generatedImageBlobId as string | undefined
+  );
   useEffect(() => {
     if (
       persistedImage &&
@@ -67,26 +78,49 @@ function ImageNodeComponent({ id, data }: NodeProps) {
       : "border-studio-node-border";
 
   const connectedRefs = useMemo(() => {
+    const { edges, nodes, nodeOutputs } = useStudioStore.getState();
     return getImageRefInputs(id, edges, nodeOutputs, nodes).filter((r) =>
       r.handle.startsWith("image_ref_")
     );
-  }, [id, edges, nodeOutputs, nodes]);
+  }, [id, upstreamImageSig]);
   const isSourcefulModel = model.startsWith("sourceful/");
 
   const handleCount = Math.max(dynamicCount, connectedRefs.length + 1);
 
+  const [downloading, setDownloading] = useState(false);
+
+  const downloadOutput = useCallback(async () => {
+    const src = nodeOutput?.image_url;
+    if (!src) return;
+    setDownloading(true);
+    try {
+      await downloadImageFromSrc(
+        src,
+        nodeLabel.trim() && nodeLabel !== "Image Generation"
+          ? nodeLabel
+          : "generated-image"
+      );
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Download failed");
+    } finally {
+      setDownloading(false);
+    }
+  }, [nodeOutput?.image_url, nodeLabel]);
+
   const generate = useCallback(async () => {
     if (!model || !apiKey) return;
+    const prev = useStudioStore.getState().nodeOutputs[id];
     setNodeOutput(id, {
-      ...nodeOutputs[id],
+      ...prev,
       status: "loading",
       error: undefined,
     });
 
     try {
-      const inputs = getNodeInputs(id, edges, nodeOutputs);
+      const { edges, nodes, nodeOutputs } = useStudioStore.getState();
+      const inputs = getNodeInputs(id, edges, nodeOutputs, nodes);
       const imageRefs = getImageRefInputs(id, edges, nodeOutputs, nodes);
-      const prompt = inputs.prompt || "";
+      const prompt = (inputs.prompt || inputs.text || "").trim();
 
       const body: Record<string, unknown> = {
         model,
@@ -210,9 +244,6 @@ function ImageNodeComponent({ id, data }: NodeProps) {
     id,
     model,
     apiKey,
-    edges,
-    nodes,
-    nodeOutputs,
     aspectRatio,
     imageSize,
     mode,
@@ -231,7 +262,23 @@ function ImageNodeComponent({ id, data }: NodeProps) {
       className={`min-w-[260px] rounded-lg border-2 ${borderColor} bg-studio-node shadow-lg relative`}
     >
       <div className="rounded-t-lg bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white flex items-center justify-between gap-2">
-        <span>{nodeLabel}</span>
+        <span className="flex items-center gap-1 min-w-0">
+          {nodeLabel}
+          <NodeMediaHistoryButton
+            nodeId={id}
+            kindFilter="generatedImage"
+            onRestore={(blobId) => {
+              updateNodeData(id, {
+                generatedImage: undefined,
+                generatedImageBlobId: blobId,
+              });
+              setNodeOutput(id, {
+                image_url: studioBlobFetchUrl(blobId),
+                status: "done",
+              });
+            }}
+          />
+        </span>
         <Input
           value={nodeLabel === "Image Generation" ? "" : nodeLabel}
           onChange={(e) =>
@@ -253,6 +300,7 @@ function ImageNodeComponent({ id, data }: NodeProps) {
           <p className="text-[10px] text-muted-foreground/90 leading-tight mb-1">
             Reference inputs are sent in both modes; use Image→Image when you want edit-style defaults.
           </p>
+          <StudioMultiImageRefHint className="text-[9px] text-muted-foreground/90 leading-snug mb-1.5" />
           <Select
             value={mode}
             onValueChange={(v) => v && updateNodeData(id, { mode: v })}
@@ -411,6 +459,17 @@ function ImageNodeComponent({ id, data }: NodeProps) {
               alt="generated"
               className="w-full max-h-[200px] rounded object-contain bg-studio-node-input"
             />
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="mt-1.5 h-7 w-full text-[10px] gap-1"
+              disabled={downloading}
+              onClick={() => void downloadOutput()}
+            >
+              <DownloadIcon className="size-3 shrink-0" />
+              {downloading ? "Saving…" : "Download image"}
+            </Button>
           </div>
         )}
         {nodeOutput?.error && (

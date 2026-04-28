@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ReactFlowProvider } from "@xyflow/react";
 import { StudioCanvas } from "@/components/canvas/StudioCanvas";
@@ -33,6 +34,9 @@ import {
   LogOutIcon,
   UserIcon,
   Trash2Icon,
+  LayoutDashboardIcon,
+  ImageIcon,
+  SettingsIcon,
 } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { signOutAtCurrentOrigin } from "@/lib/studio-sign-out";
@@ -41,7 +45,7 @@ import { getRunnableNodes, hasUpstreamOutput } from "@/lib/autorun";
 import { useStudioCloudSync } from "@/components/studio/useStudioCloudSync";
 import { saveStudioSettingsToServer } from "@/lib/studio-settings-api";
 import { getCanvasViewportFloatingProps } from "@/lib/canvas-floating-props";
-import { formatWorkflowSavedAt } from "@/lib/utils";
+import { formatWorkflowSavedAt, cn } from "@/lib/utils";
 import { ThemedLogo } from "@/components/theme/ThemedLogo";
 import { toast } from "@/lib/toast";
 import { buildStudioMediaZip, type StudioMediaZipOptions } from "@/lib/studio-media-zip";
@@ -57,7 +61,6 @@ export default function StudioPage() {
   const loadWorkflow = useStudioStore((s) => s.loadWorkflow);
   const deleteWorkflow = useStudioStore((s) => s.deleteWorkflow);
   const newWorkflow = useStudioStore((s) => s.newWorkflow);
-  const exportWorkflow = useStudioStore((s) => s.exportWorkflow);
   const importWorkflow = useStudioStore((s) => s.importWorkflow);
   const undo = useStudioStore((s) => s.undo);
   const redo = useStudioStore((s) => s.redo);
@@ -117,18 +120,30 @@ export default function StudioPage() {
   }, []);
 
   const handleConfirmExport = useCallback(
-    (filename: string) => {
-      const json = exportWorkflow();
-      const blob = new Blob([json], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${filename}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
-      toast.success("Workflow exported");
+    async (filename: string) => {
+      const t = toast.loading("Preparing export…");
+      try {
+        const { expandStudioGraphForExport } = await import("@/lib/studio-expand-graph-export");
+        const s = useStudioStore.getState();
+        const expanded = await expandStudioGraphForExport(s.nodes, s.edges);
+        const json = JSON.stringify(
+          { nodes: expanded.nodes, edges: expanded.edges, version: 1 },
+          null,
+          2
+        );
+        const blob = new Blob([json], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${filename}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        toast.success("Workflow exported", { id: t });
+      } catch {
+        toast.error("Export failed", { id: t });
+      }
     },
-    [exportWorkflow]
+    []
   );
 
   const handleImport = useCallback(() => {
@@ -247,6 +262,36 @@ export default function StudioPage() {
         {/* Header */}
         <header className="flex h-12 flex-shrink-0 items-center justify-between border-b border-studio-node-border bg-studio-bg px-4">
           <div className="flex items-center gap-2.5">
+            <Link
+              href="/home"
+              title="Home"
+              className={cn(
+                "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md",
+                "text-foreground hover:bg-accent transition-colors"
+              )}
+            >
+              <LayoutDashboardIcon className="size-3.5" />
+            </Link>
+            <Link
+              href="/media"
+              title="Media library"
+              className={cn(
+                "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md",
+                "text-foreground hover:bg-accent transition-colors"
+              )}
+            >
+              <ImageIcon className="size-3.5" />
+            </Link>
+            <Link
+              href="/settings"
+              title="Settings"
+              className={cn(
+                "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md",
+                "text-foreground hover:bg-accent transition-colors"
+              )}
+            >
+              <SettingsIcon className="size-3.5" />
+            </Link>
             <ThemedLogo className="h-6 w-6" />
             <span className="text-sm font-bold tracking-tight">
               <span className="text-[#ff6b35]">OpenRouter</span>{" "}

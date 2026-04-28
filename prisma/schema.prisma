@@ -18,9 +18,45 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  accounts Account[]
-  sessions Session[]
-  studioState UserStudioState?
+  accounts            Account[]
+  sessions            Session[]
+  studioState         UserStudioState?
+  studioBlobs         StudioBlob[]
+  studioNodeMediaVersions StudioNodeMediaVersion[]
+}
+
+/// Binary media for Studio nodes (S3-compatible object storage, e.g. MinIO in Docker Compose).
+model StudioBlob {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  s3Key     String   @unique
+  mimeType  String
+  byteSize  Int
+  createdAt DateTime @default(now())
+  /** Canvas / workflow context at upload time (optional for legacy rows). */
+  sourceNodeId    String?
+  sourceNodeType  String?
+  sourceNodeLabel String?
+  mediaFieldKind  String?
+
+  versions StudioNodeMediaVersion[]
+
+  @@index([userId, createdAt])
+}
+
+/// Prior outputs per canvas node (for restore / history UI). Not a full base64 chain in JSON.
+model StudioNodeMediaVersion {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  nodeId    String
+  blobId    String
+  blob      StudioBlob @relation(fields: [blobId], references: [id], onDelete: Cascade)
+  kind      String
+  createdAt DateTime @default(now())
+
+  @@index([userId, nodeId, kind])
 }
 
 /// Encrypted API key + canvas snapshot per user (synced across devices).

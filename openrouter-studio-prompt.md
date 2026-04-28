@@ -109,7 +109,8 @@ Il canvas deve supportare:
 **ImageNode** (image generation)
 - Handle di input:
   - `prompt` (string) — obbligatorio
-  - `image_ref_N` (string, image_url) — **multiplo e dinamico**, tutti opzionali. Parte con un handle `image_ref_1` visibile. Ogni volta che viene connesso un handle, appare automaticamente il successivo (`image_ref_2`, `image_ref_3`, ...) senza limite fisso. Se un handle viene disconnesso, collassa nuovamente (ma non rimuove handle intermedi già connessi).
+  - `image_ref_N` (string, image_url) — **multiplo e dinamico**, tutti opzionali. Parte con un handle `image_ref_1` visibile. Ogni volta che viene connesso un handle, appare automaticamente il successivo (`image_ref_2`, `image_ref_3`, ...) senza **limite fisso nel canvas**. Se un handle viene disconnesso, collassa nuovamente (ma non rimuove handle intermedi già connessi).
+  - **Limite reale (API / modello):** OpenRouter permette più immagini nel messaggio (una voce `image_url` per immagine), ma [nella guida multimodale](https://openrouter.ai/docs/guides/overview/multimodal/images) si indica che **il numero massimo consentito dipende da provider e modello**, non da un tetto unico fissato dall’API. Oltre quel limite la richiesta può fallire o il modello può non usare tutti gli input; conviene controllare il modello scelto su OpenRouter.
 - Handle di output: `image_url` (string)
 - Gli handle `image_ref_*` connessi mostrano thumbnail preview (40x40)
 - Dropdown per selezionare modello immagine (filtrato per `modalities` che include `image`)
@@ -124,7 +125,7 @@ Il canvas deve supportare:
   - `prompt` (string) — obbligatorio
   - `first_frame` (string, image_url) — opzionale, singolo
   - `last_frame` (string, image_url) — opzionale, singolo
-  - `character_ref_N` (string, image_url) — **multiplo e dinamico**: parte con `character_ref_1`, ogni connessione genera il successivo automaticamente. Serve a passare più personaggi distinti nella stessa generazione (es. personaggio A + personaggio B). Stesso pattern degli handle dinamici di ImageNode.
+  - `character_ref_N` (string, image_url) — **multiplo e dinamico**: parte con `character_ref_1`, ogni connessione genera il successivo automaticamente. Serve a passare più personaggi distinti nella stessa generazione (es. personaggio A + personaggio B). Stesso pattern degli handle dinamici di ImageNode. **Stesso limite effettivo per provider/modello** descritto sopra per `image_ref_*` (il canvas non impone un tetto, l’API sottostante sì).
   - `style_ref` (string, image_url) — opzionale, singolo
 - Handle di output: `video_url` (string)
 - Gli handle immagine connessi mostrano thumbnail preview (40x40)

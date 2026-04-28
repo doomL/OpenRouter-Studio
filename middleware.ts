@@ -5,5 +5,5 @@ const { auth } = NextAuth(edgeAuthConfig);
 export const middleware = auth;
 
 export const config = {
-  matcher: ["/studio/:path*"],
+  matcher: ["/studio/:path*", "/home", "/media", "/settings"],
 };

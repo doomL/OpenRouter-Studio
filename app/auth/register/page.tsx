@@ -42,7 +42,7 @@ export default function RegisterPage() {
       if (loginRes?.error) {
         router.push("/auth/login");
       } else {
-        router.push("/studio");
+        router.push("/home");
       }
     } catch {
       setError("Something went wrong");

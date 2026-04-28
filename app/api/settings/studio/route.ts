@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { decryptApiKey, encryptApiKey } from "@/lib/studio-crypto";
+import { persistStudioGraphMediaToBlobs } from "@/lib/studio-persist-inline-media";
 import type { Prisma } from "@/lib/generated/prisma/client";
 
 function emptyPayload() {
@@ -97,11 +98,15 @@ export async function PUT(req: Request) {
   }
   const theme = b.theme === "light" ? "light" : "dark";
 
-  const nodes = jsonField(b.nodes, []);
+  let nodes = jsonField(b.nodes, []);
+  let workflows = jsonField(b.workflows, []);
   const edges = jsonField(b.edges, []);
-  const workflows = jsonField(b.workflows, []);
   const videoJobs = jsonField(b.videoJobs, {});
   const dynamicHandleCounts = jsonField(b.dynamicHandleCounts, {});
+
+  const persisted = await persistStudioGraphMediaToBlobs(userId, nodes as never[], workflows as never[]);
+  nodes = persisted.nodes as unknown[];
+  workflows = persisted.workflows as unknown[];
 
   await prisma.userStudioState.upsert({
     where: { userId },
@@ -125,7 +130,7 @@ export async function PUT(req: Request) {
       theme,
     },
   });
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, nodes, workflows });
 }
 
 function jsonField(value: unknown, fallback: unknown): unknown {

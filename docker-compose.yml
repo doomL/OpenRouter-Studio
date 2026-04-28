@@ -1,4 +1,45 @@
 services:
+  # MinIO S3 API for studio media blobs (same env vars work for AWS S3 or other S3-compatible backends).
+  # Console: http://localhost:${MINIO_CONSOLE_PORT:-9001} (optional).
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${STUDIO_S3_ACCESS_KEY:-minio}
+      MINIO_ROOT_PASSWORD: ${STUDIO_S3_SECRET_KEY:-minio_secret_change_me}
+    volumes:
+      - minio-data:/data
+    # Expose only on loopback so S3/Console are not reachable from other machines.
+    ports:
+      - "127.0.0.1:${MINIO_PORT:-9000}:9000"
+      - "127.0.0.1:${MINIO_CONSOLE_PORT:-9001}:9001"
+
+  # Creates the bucket once MinIO accepts connections (required before uploads work).
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      - minio
+    environment:
+      MINIO_ROOT_USER: ${STUDIO_S3_ACCESS_KEY:-minio}
+      MINIO_ROOT_PASSWORD: ${STUDIO_S3_SECRET_KEY:-minio_secret_change_me}
+      STUDIO_S3_BUCKET: ${STUDIO_S3_BUCKET:-studio-media}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        ok=0
+        for i in $$(seq 1 60); do
+          if mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD"; then
+            ok=1
+            break
+          fi
+          sleep 1
+        done
+        if [ "$$ok" != "1" ]; then echo "MinIO not reachable after 60s"; exit 1; fi
+        mc mb "local/$$STUDIO_S3_BUCKET" --ignore-existing
+        echo "Bucket $$STUDIO_S3_BUCKET ready."
+
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
@@ -25,6 +66,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
     env_file:
       - path: .env
         required: false
@@ -39,6 +82,13 @@ services:
       # Raise Node.js V8 heap limit (default ~1.5 GB regardless of server RAM).
       # Adjust to ~75 % of available RAM; e.g. 8 GB server → 6144, 16 GB → 12288.
       NODE_OPTIONS: "--max-old-space-size=4096"
+      # Object storage inside the Compose network (override in `.env` if you use external S3).
+      STUDIO_S3_ENDPOINT: "http://minio:9000"
+      STUDIO_S3_REGION: "${STUDIO_S3_REGION:-us-east-1}"
+      STUDIO_S3_BUCKET: "${STUDIO_S3_BUCKET:-studio-media}"
+      STUDIO_S3_ACCESS_KEY: "${STUDIO_S3_ACCESS_KEY:-minio}"
+      STUDIO_S3_SECRET_KEY: "${STUDIO_S3_SECRET_KEY:-minio_secret_change_me}"
 
 volumes:
   postgres-data:
+  minio-data:

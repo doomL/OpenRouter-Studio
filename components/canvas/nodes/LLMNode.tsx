@@ -61,7 +61,7 @@ function LLMNodeComponent({ id, data }: NodeProps) {
     });
 
     try {
-      const inputs = getNodeInputs(id, edges, nodeOutputs);
+      const inputs = getNodeInputs(id, edges, nodeOutputs, nodes);
       const imageRefs = getImageRefInputs(id, edges, nodeOutputs, nodes);
 
       const prompt = inputs.prompt || inputs.text || "";

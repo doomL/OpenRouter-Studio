@@ -14,6 +14,36 @@ import {
   mergeDynamicHandleCounts,
   rebuildDynamicHandleCountsFromEdges,
 } from "@/lib/canvas-handles";
+import { stripNodesForLocalBackup } from "@/lib/studio-local-backup";
+
+/** Cloud autosave: layout-only changes get a longer debounce (drag, select). */
+export type CloudSaveMutationTier = "layout" | "structural";
+
+function foldCloudSaveTier(
+  prev: CloudSaveMutationTier,
+  next: CloudSaveMutationTier
+): CloudSaveMutationTier {
+  return next === "structural" || prev === "structural" ? "structural" : "layout";
+}
+
+function isLayoutOnlyNodeChanges(
+  changes: Parameters<OnNodesChange>[0]
+): boolean {
+  if (!changes.length) return true;
+  return changes.every(
+    (c) =>
+      c.type === "position" ||
+      c.type === "select" ||
+      c.type === "dimensions"
+  );
+}
+
+function isLayoutOnlyEdgeChanges(
+  changes: Parameters<OnEdgesChange>[0]
+): boolean {
+  if (!changes.length) return true;
+  return changes.every((c) => c.type === "select");
+}
 
 export interface NodeOutput {
   text?: string;
@@ -50,6 +80,13 @@ interface HistoryEntry {
 }
 
 const MAX_HISTORY = 50;
+
+function snapshotGraph(nodes: Node[], edges: Edge[]): HistoryEntry {
+  return {
+    nodes: JSON.parse(JSON.stringify(nodes)),
+    edges: JSON.parse(JSON.stringify(edges)),
+  };
+}
 
 export const STUDIO_NODE_CLIPBOARD_VERSION = 1;
 
@@ -148,6 +185,9 @@ interface StudioState {
   // Canvas
   nodes: Node[];
   edges: Edge[];
+  /** Drives debounce for cloud save: layout (long) vs structural (short). */
+  cloudSaveMutationTier: CloudSaveMutationTier;
+  resetCloudSaveTier: () => void;
   onNodesChange: OnNodesChange;
   onEdgesChange: OnEdgesChange;
   onConnect: OnConnect;
@@ -192,9 +232,9 @@ interface StudioState {
   /** Round every node position to the grid (one-shot layout). */
   snapAllNodesToGrid: () => void;
 
-  // Undo / Redo
-  history: HistoryEntry[];
-  historyIndex: number;
+  // Undo / Redo (past stack = snapshots before each tracked change; future = undone states)
+  undoPast: HistoryEntry[];
+  undoFuture: HistoryEntry[];
   pushHistory: () => void;
   undo: () => void;
   redo: () => void;
@@ -206,6 +246,13 @@ interface StudioState {
 
   /** Server snapshot (GET /api/settings/studio) */
   hydrateFromServer: (payload: StudioServerSnapshot) => void;
+  /** After PUT: apply server-persisted graph (media as blob ids) without echoing another cloud save. */
+  applyPersistedServerStudioGraph: (
+    nodes: Node[],
+    workflows: Workflow[]
+  ) => void;
+  /** Non-persisted counter: while > 0, cloud sync subscriber ignores changes. */
+  studioRemoteEchoSuppression: number;
   clearStudioForLogout: () => void;
 }
 
@@ -239,7 +286,11 @@ export const useStudioStore = create<StudioState>()(
     (set, get) => ({
       // API Key
       apiKey: "",
-      setApiKey: (key) => set({ apiKey: key }),
+      setApiKey: (key) =>
+        set((s) => ({
+          apiKey: key,
+          cloudSaveMutationTier: foldCloudSaveTier(s.cloudSaveMutationTier, "structural"),
+        })),
 
       // Models
       models: null,
@@ -248,16 +299,26 @@ export const useStudioStore = create<StudioState>()(
       // Canvas
       nodes: [],
       edges: [],
+      cloudSaveMutationTier: "layout",
+      studioRemoteEchoSuppression: 0,
+      resetCloudSaveTier: () => set({ cloudSaveMutationTier: "layout" }),
       onNodesChange: (changes) => {
-        // Push history before deletes
         const hasDeletes = changes.some((c) => c.type === "remove");
         if (hasDeletes) get().pushHistory();
-        set({ nodes: applyNodeChanges(changes, get().nodes) });
+        const tier = isLayoutOnlyNodeChanges(changes) ? "layout" : "structural";
+        set((s) => ({
+          nodes: applyNodeChanges(changes, s.nodes),
+          cloudSaveMutationTier: foldCloudSaveTier(s.cloudSaveMutationTier, tier),
+        }));
       },
       onEdgesChange: (changes) => {
         const hasDeletes = changes.some((c) => c.type === "remove");
         if (hasDeletes) get().pushHistory();
-        set({ edges: applyEdgeChanges(changes, get().edges) });
+        const tier = isLayoutOnlyEdgeChanges(changes) ? "layout" : "structural";
+        set((s) => ({
+          edges: applyEdgeChanges(changes, s.edges),
+          cloudSaveMutationTier: foldCloudSaveTier(s.cloudSaveMutationTier, tier),
+        }));
       },
       onConnect: (connection) => {
         // Validate connection type compatibility
@@ -267,7 +328,10 @@ export const useStudioStore = create<StudioState>()(
           }
         }
         get().pushHistory();
-        set({ edges: addEdge(connection, get().edges) });
+        set((s) => ({
+          edges: addEdge(connection, s.edges),
+          cloudSaveMutationTier: foldCloudSaveTier(s.cloudSaveMutationTier, "structural"),
+        }));
         // Update dynamic handle counts
         const targetNode = get().nodes.find((n) => n.id === connection.target);
         if (targetNode && connection.targetHandle) {
@@ -283,18 +347,30 @@ export const useStudioStore = create<StudioState>()(
           }
         }
       },
-      setNodes: (nodes) => set({ nodes }),
-      setEdges: (edges) => set({ edges }),
+      setNodes: (nodes) =>
+        set((s) => ({
+          nodes,
+          cloudSaveMutationTier: foldCloudSaveTier(s.cloudSaveMutationTier, "structural"),
+        })),
+      setEdges: (edges) =>
+        set((s) => ({
+          edges,
+          cloudSaveMutationTier: foldCloudSaveTier(s.cloudSaveMutationTier, "structural"),
+        })),
       addNode: (node) => {
         get().pushHistory();
-        set({ nodes: [...get().nodes, node] });
+        set((s) => ({
+          nodes: [...s.nodes, node],
+          cloudSaveMutationTier: foldCloudSaveTier(s.cloudSaveMutationTier, "structural"),
+        }));
       },
       updateNodeData: (nodeId, data) =>
-        set({
-          nodes: get().nodes.map((n) =>
+        set((s) => ({
+          nodes: s.nodes.map((n) =>
             n.id === nodeId ? { ...n, data: { ...n.data, ...data } } : n
           ),
-        }),
+          cloudSaveMutationTier: foldCloudSaveTier(s.cloudSaveMutationTier, "structural"),
+        })),
       duplicateNode: (nodeId) => {
         const node = get().nodes.find((n) => n.id === nodeId);
         if (!node) return;
@@ -311,7 +387,10 @@ export const useStudioStore = create<StudioState>()(
           clone.type === "freeText"
             ? { ...clone, className: "studio-node-freetext" }
             : clone;
-        set({ nodes: [...get().nodes, next] });
+        set((s) => ({
+          nodes: [...s.nodes, next],
+          cloudSaveMutationTier: foldCloudSaveTier(s.cloudSaveMutationTier, "structural"),
+        }));
       },
       buildSelectedNodesClipboardPayload: () => {
         const { nodes, edges, dynamicHandleCounts } = get();
@@ -380,11 +459,12 @@ export const useStudioStore = create<StudioState>()(
             if (nid) newDynamic[nid] = { ...srcCounts[oldId] };
           }
         }
-        set({
+        set((s) => ({
           nodes: [...existingNodes, ...normalizeFreeTextNodes(newNodes)],
-          edges: [...get().edges, ...newEdges],
+          edges: [...s.edges, ...newEdges],
           dynamicHandleCounts: newDynamic,
-        });
+          cloudSaveMutationTier: foldCloudSaveTier(s.cloudSaveMutationTier, "structural"),
+        }));
       },
 
       // Node outputs
@@ -395,20 +475,24 @@ export const useStudioStore = create<StudioState>()(
       // Dynamic handles
       dynamicHandleCounts: {},
       updateDynamicHandleCount: (nodeId, type, count) =>
-        set({
+        set((s) => ({
           dynamicHandleCounts: {
-            ...get().dynamicHandleCounts,
+            ...s.dynamicHandleCounts,
             [nodeId]: {
-              ...get().dynamicHandleCounts[nodeId],
+              ...s.dynamicHandleCounts[nodeId],
               [type]: count,
             },
           },
-        }),
+          cloudSaveMutationTier: foldCloudSaveTier(s.cloudSaveMutationTier, "structural"),
+        })),
 
       // Video jobs
       videoJobs: {},
       setVideoJob: (nodeId, job) =>
-        set({ videoJobs: { ...get().videoJobs, [nodeId]: job } }),
+        set((s) => ({
+          videoJobs: { ...s.videoJobs, [nodeId]: job },
+          cloudSaveMutationTier: foldCloudSaveTier(s.cloudSaveMutationTier, "structural"),
+        })),
 
       // Workflows
       workflows: [],
@@ -418,34 +502,47 @@ export const useStudioStore = create<StudioState>()(
           id: crypto.randomUUID(),
           name,
           savedAt: new Date().toISOString(),
-          nodes,
-          edges,
+          nodes: stripNodesForLocalBackup(nodes),
+          edges: JSON.parse(JSON.stringify(edges)) as Edge[],
         };
         const updated = [workflow, ...workflows].slice(0, 10);
-        set({ workflows: updated });
+        set((s) => ({
+          workflows: updated,
+          cloudSaveMutationTier: foldCloudSaveTier(s.cloudSaveMutationTier, "structural"),
+        }));
       },
       loadWorkflow: (id) => {
         const workflow = get().workflows.find((w) => w.id === id);
-        if (workflow) {
-          set({
-            nodes: normalizeFreeTextNodes(workflow.nodes),
-            edges: workflow.edges,
-            nodeOutputs: {},
-            dynamicHandleCounts: rebuildDynamicHandleCountsFromEdges(workflow.edges),
-            videoJobs: {},
-          });
-        }
+        if (!workflow) return;
+        const nodes = normalizeFreeTextNodes(workflow.nodes);
+        const edges = workflow.edges;
+        set((s) => ({
+          nodes,
+          edges,
+          nodeOutputs: {},
+          dynamicHandleCounts: rebuildDynamicHandleCountsFromEdges(edges),
+          videoJobs: {},
+          cloudSaveMutationTier: foldCloudSaveTier(s.cloudSaveMutationTier, "structural"),
+          undoPast: [],
+          undoFuture: [],
+        }));
       },
       deleteWorkflow: (id) =>
-        set({ workflows: get().workflows.filter((w) => w.id !== id) }),
+        set((s) => ({
+          workflows: s.workflows.filter((w) => w.id !== id),
+          cloudSaveMutationTier: foldCloudSaveTier(s.cloudSaveMutationTier, "structural"),
+        })),
       newWorkflow: () =>
-        set({
+        set((s) => ({
           nodes: [],
           edges: [],
           nodeOutputs: {},
           dynamicHandleCounts: {},
           videoJobs: {},
-        }),
+          cloudSaveMutationTier: foldCloudSaveTier(s.cloudSaveMutationTier, "structural"),
+          undoPast: [],
+          undoFuture: [],
+        })),
       exportWorkflow: () => {
         const { nodes, edges } = get();
         return JSON.stringify({ nodes, edges, version: 1 }, null, 2);
@@ -455,13 +552,14 @@ export const useStudioStore = create<StudioState>()(
           const data = JSON.parse(json);
           if (!data.nodes || !data.edges) return false;
           get().pushHistory();
-          set({
+          set((s) => ({
             nodes: normalizeFreeTextNodes(data.nodes as Node[]),
             edges: data.edges,
             nodeOutputs: {},
             dynamicHandleCounts: rebuildDynamicHandleCountsFromEdges(data.edges),
             videoJobs: {},
-          });
+            cloudSaveMutationTier: foldCloudSaveTier(s.cloudSaveMutationTier, "structural"),
+          }));
           return true;
         } catch {
           return false;
@@ -471,7 +569,10 @@ export const useStudioStore = create<StudioState>()(
       // Theme
       theme: "dark",
       toggleTheme: () =>
-        set({ theme: get().theme === "dark" ? "light" : "dark" }),
+        set((s) => ({
+          theme: s.theme === "dark" ? "light" : "dark",
+          cloudSaveMutationTier: foldCloudSaveTier(s.cloudSaveMutationTier, "structural"),
+        })),
 
       snapToGrid: false,
       toggleSnapToGrid: () => set({ snapToGrid: !get().snapToGrid }),
@@ -480,7 +581,7 @@ export const useStudioStore = create<StudioState>()(
         const { nodes } = get();
         if (nodes.length === 0) return;
         get().pushHistory();
-        set({
+        set((s) => ({
           nodes: nodes.map((n) => ({
             ...n,
             position: {
@@ -488,60 +589,47 @@ export const useStudioStore = create<StudioState>()(
               y: Math.round(n.position.y / GRID) * GRID,
             },
           })),
-        });
+          cloudSaveMutationTier: foldCloudSaveTier(s.cloudSaveMutationTier, "structural"),
+        }));
       },
 
       // Undo / Redo
-      history: [],
-      historyIndex: -1,
+      undoPast: [],
+      undoFuture: [],
       pushHistory: () => {
-        const { nodes, edges, history, historyIndex } = get();
-        // Trim future entries if we undid something
-        const trimmed = history.slice(0, historyIndex + 1);
-        const entry: HistoryEntry = {
-          nodes: JSON.parse(JSON.stringify(nodes)),
-          edges: JSON.parse(JSON.stringify(edges)),
-        };
-        const updated = [...trimmed, entry].slice(-MAX_HISTORY);
-        set({ history: updated, historyIndex: updated.length - 1 });
+        const { nodes, edges, undoPast } = get();
+        set({
+          undoPast: [...undoPast, snapshotGraph(nodes, edges)].slice(-MAX_HISTORY),
+          undoFuture: [],
+        });
       },
       undo: () => {
-        const { history, historyIndex, nodes, edges } = get();
-        if (historyIndex < 0) return;
-        // Save current state as "future" if we haven't already
-        const entry = history[historyIndex];
-        if (!entry) return;
-        // If at the tip, push current first so redo works
-        if (historyIndex === history.length - 1) {
-          const current: HistoryEntry = {
-            nodes: JSON.parse(JSON.stringify(nodes)),
-            edges: JSON.parse(JSON.stringify(edges)),
-          };
-          set({
-            nodes: entry.nodes,
-            edges: entry.edges,
-            history: [...history, current],
-            historyIndex: historyIndex - 1,
-          });
-        } else {
-          set({
-            nodes: entry.nodes,
-            edges: entry.edges,
-            historyIndex: historyIndex - 1,
-          });
-        }
+        const { undoPast, nodes, edges } = get();
+        if (undoPast.length === 0) return;
+        const prev = undoPast[undoPast.length - 1];
+        const newPast = undoPast.slice(0, -1);
+        const currentSnap = snapshotGraph(nodes, edges);
+        set((s) => ({
+          nodes: prev.nodes,
+          edges: prev.edges,
+          undoPast: newPast,
+          undoFuture: [...s.undoFuture, currentSnap].slice(-MAX_HISTORY),
+          cloudSaveMutationTier: foldCloudSaveTier(s.cloudSaveMutationTier, "structural"),
+        }));
       },
       redo: () => {
-        const { history, historyIndex } = get();
-        const nextIndex = historyIndex + 2; // +2 because undo decrements by 1 and we want the one after current
-        if (nextIndex >= history.length) return;
-        const entry = history[nextIndex];
-        if (!entry) return;
-        set({
-          nodes: entry.nodes,
-          edges: entry.edges,
-          historyIndex: historyIndex + 1,
-        });
+        const { undoFuture, nodes, edges } = get();
+        if (undoFuture.length === 0) return;
+        const next = undoFuture[undoFuture.length - 1];
+        const newFuture = undoFuture.slice(0, -1);
+        const currentSnap = snapshotGraph(nodes, edges);
+        set((s) => ({
+          nodes: next.nodes,
+          edges: next.edges,
+          undoPast: [...s.undoPast, currentSnap].slice(-MAX_HISTORY),
+          undoFuture: newFuture,
+          cloudSaveMutationTier: foldCloudSaveTier(s.cloudSaveMutationTier, "structural"),
+        }));
       },
 
       // Cost tracker
@@ -576,9 +664,25 @@ export const useStudioStore = create<StudioState>()(
               : {},
           dynamicHandleCounts: mergeDynamicHandleCounts(fromEdges, fromPayload),
           nodeOutputs: {},
-          history: [],
-          historyIndex: -1,
+          undoPast: [],
+          undoFuture: [],
           models: null,
+          cloudSaveMutationTier: "layout",
+          studioRemoteEchoSuppression: 0,
+        });
+      },
+      applyPersistedServerStudioGraph: (nodes, workflows) => {
+        set((s) => ({
+          studioRemoteEchoSuppression: s.studioRemoteEchoSuppression + 1,
+          nodes: normalizeFreeTextNodes(nodes),
+          workflows,
+          // Keep runtime previews (`nodeOutputs`). Clearing caused every image node to refetch blobs
+          // after each save echo. Fresh loads still reset via hydrateFromServer.
+        }));
+        queueMicrotask(() => {
+          set((s) => ({
+            studioRemoteEchoSuppression: Math.max(0, s.studioRemoteEchoSuppression - 1),
+          }));
         });
       },
       clearStudioForLogout: () =>
@@ -591,10 +695,12 @@ export const useStudioStore = create<StudioState>()(
           dynamicHandleCounts: {},
           nodeOutputs: {},
           models: null,
-          history: [],
-          historyIndex: -1,
+          undoPast: [],
+          undoFuture: [],
           sessionCost: 0,
           theme: "dark",
+          cloudSaveMutationTier: "layout",
+          studioRemoteEchoSuppression: 0,
         }),
     }),
     {

@@ -28,15 +28,29 @@ export const edgeAuthConfig = {
     authorized({ auth }) {
       return !!auth?.user;
     },
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger, session }) {
       if (user) {
         token.id = user.id;
+        token.name = user.name;
+        token.email = user.email;
+      }
+      if (trigger === "update" && session && typeof session === "object") {
+        const s = session as { name?: string };
+        if (typeof s.name === "string") {
+          token.name = s.name.trim() || token.name;
+        }
       }
       return token;
     },
     async session({ session, token }) {
       if (token?.id) {
         session.user.id = token.id as string;
+      }
+      if (typeof token.name === "string") {
+        session.user.name = token.name;
+      }
+      if (typeof token.email === "string") {
+        session.user.email = token.email;
       }
       return session;
     },

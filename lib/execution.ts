@@ -2,19 +2,81 @@ import { type Edge, type Node } from "@xyflow/react";
 import { imageUrlFromPersistedNodeData } from "@/lib/canvas-handles";
 import { type NodeOutput } from "./store";
 
+function hasUsefulText(v: string | undefined): boolean {
+  return v != null && String(v).length > 0;
+}
+
+/**
+ * Prefer live `nodeOutputs`, but fill from `node.data` when outputs are missing or still empty
+ * (hydration race, sync clearing outputs, or stale empty objects).
+ */
+function mergeSourceOutputWithNodeData(
+  sourceId: string,
+  base: NodeOutput | undefined,
+  nodeById: Map<string, Node> | null
+): NodeOutput | undefined {
+  if (!nodeById) return base;
+  const srcNode = nodeById.get(sourceId);
+  if (!srcNode) return base;
+
+  if (srcNode.type === "prompt") {
+    const d = srcNode.data as Record<string, unknown>;
+    const pText = typeof d.prompt === "string" ? d.prompt : "";
+    const sText = typeof d.systemPrompt === "string" ? d.systemPrompt : "";
+    return {
+      ...(base ?? {}),
+      text: hasUsefulText(base?.text) ? base!.text : pText,
+      system: hasUsefulText(base?.system) ? base!.system : sText,
+      status: base?.status ?? "done",
+    };
+  }
+
+  if (srcNode.type === "llm") {
+    const d = srcNode.data as Record<string, unknown>;
+    const g = d.generatedText;
+    const persisted = typeof g === "string" && g.length > 0 ? g : undefined;
+    if (!hasUsefulText(base?.text) && !persisted && !base) return undefined;
+    return {
+      ...(base ?? {}),
+      text: hasUsefulText(base?.text) ? base!.text : persisted ?? base?.text ?? "",
+      status: base?.status ?? "done",
+    };
+  }
+
+  if (srcNode.type === "audioGen") {
+    const d = srcNode.data as Record<string, unknown>;
+    const t = d.generatedTranscript;
+    const persisted = typeof t === "string" && t.length > 0 ? t : undefined;
+    if (!hasUsefulText(base?.text) && !persisted && !base) return undefined;
+    return {
+      ...(base ?? {}),
+      text: hasUsefulText(base?.text) ? base!.text : persisted ?? base?.text ?? "",
+      status: base?.status ?? "done",
+    };
+  }
+
+  return base;
+}
+
 /**
  * Get input values for a node by reading connected source node outputs
  */
 export function getNodeInputs(
   nodeId: string,
   edges: Edge[],
-  nodeOutputs: Record<string, NodeOutput>
+  nodeOutputs: Record<string, NodeOutput>,
+  nodes?: Node[]
 ): Record<string, string | undefined> {
   const inputs: Record<string, string | undefined> = {};
+  const nodeById = nodes ? new Map(nodes.map((n) => [n.id, n])) : null;
 
   const incomingEdges = edges.filter((e) => e.target === nodeId);
   for (const edge of incomingEdges) {
-    const sourceOutput = nodeOutputs[edge.source];
+    const sourceOutput = mergeSourceOutputWithNodeData(
+      edge.source,
+      nodeOutputs[edge.source],
+      nodeById
+    );
     if (!sourceOutput) continue;
 
     const sourceHandle = edge.sourceHandle || "";
@@ -84,4 +146,59 @@ export function getImageRefInputs(
   }
 
   return refs;
+}
+
+/**
+ * Compact fingerprint for zustand selectors: changes when any upstream image used as a ref
+ * into `nodeId` might have changed (outputs or persisted node.data media fields).
+ */
+export function imageRefSourcesSignature(
+  nodeId: string,
+  edges: Edge[],
+  nodeOutputs: Record<string, NodeOutput>,
+  nodes: Node[]
+): string {
+  const nodeById = new Map(nodes.map((n) => [n.id, n]));
+  const parts: string[] = [];
+  for (const e of edges) {
+    if (e.target !== nodeId) continue;
+    const th = e.targetHandle || "";
+    if (
+      !th.startsWith("image_ref_") &&
+      !th.startsWith("character_ref_") &&
+      th !== "first_frame" &&
+      th !== "last_frame" &&
+      th !== "style_ref" &&
+      th !== "image_url"
+    ) {
+      continue;
+    }
+    const src = e.source;
+    const o = nodeOutputs[src];
+    const n = nodeById.get(src);
+    const d = (n?.data ?? {}) as Record<string, unknown>;
+    const blob =
+      (d.generatedImageBlobId as string) ||
+      (d.imagePreviewBlobId as string) ||
+      (d.imageUrlBlobId as string) ||
+      (d.previewBlobId as string) ||
+      "";
+    const inlineLen = (() => {
+      const a = d.generatedImage as string | undefined;
+      const b = d.imagePreview as string | undefined;
+      const c = d.imageUrl as string | undefined;
+      const p = d.preview as string | undefined;
+      return Math.max(
+        a?.length ?? 0,
+        b?.length ?? 0,
+        c?.length ?? 0,
+        p?.length ?? 0
+      );
+    })();
+    parts.push(
+      `${src}:${th}:${o?.image_url ?? ""}:${o?.image_base64?.length ?? 0}:${blob}:${inlineLen}`
+    );
+  }
+  parts.sort();
+  return parts.join("|");
 }

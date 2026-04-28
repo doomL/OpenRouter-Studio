@@ -19,6 +19,8 @@ import { HandleLabel } from "@/components/canvas/HandleLabel";
 import { getCanvasSelectContentProps } from "@/lib/canvas-floating-props";
 import { readJsonResponse } from "@/lib/read-json-response";
 import { fetchWithRetry, STUDIO_FETCH_MAX_ATTEMPTS } from "@/lib/fetch-with-retry";
+import { NodeMediaHistoryButton } from "@/components/studio/NodeMediaHistoryButton";
+import { pickInlineOrBlobUrl, studioBlobFetchUrl } from "@/lib/studio-node-media-url";
 
 const AUDIO_FORMATS = ["wav", "mp3", "flac", "opus", "pcm16"] as const;
 /** Common OpenAI-style voices — not every audio model supports these. */
@@ -36,6 +38,7 @@ function AudioNodeComponent({ id, data }: NodeProps) {
   const setNodeOutput = useStudioStore((s) => s.setNodeOutput);
   const nodeOutput = useStudioStore((s) => s.nodeOutputs[id]);
   const edges = useStudioStore((s) => s.edges);
+  const nodes = useStudioStore((s) => s.nodes);
   const nodeOutputs = useStudioStore((s) => s.nodeOutputs);
   const apiKey = useStudioStore((s) => s.apiKey);
 
@@ -45,19 +48,24 @@ function AudioNodeComponent({ id, data }: NodeProps) {
   const format = (data.format as string) || "wav";
 
   useEffect(() => {
+    const audioUrl = pickInlineOrBlobUrl(
+      data.generatedAudio as string | undefined,
+      data.generatedAudioBlobId as string | undefined
+    );
     if (
-      (data.generatedAudio || data.generatedTranscript) &&
+      (audioUrl || data.generatedTranscript) &&
       !nodeOutput?.audio_url &&
       nodeOutput?.status !== "loading"
     ) {
       setNodeOutput(id, {
-        audio_url: (data.generatedAudio as string) || undefined,
+        audio_url: audioUrl,
         text: (data.generatedTranscript as string) || undefined,
         status: "done",
       });
     }
   }, [
     data.generatedAudio,
+    data.generatedAudioBlobId,
     data.generatedTranscript,
     id,
     nodeOutput?.audio_url,
@@ -84,7 +92,7 @@ function AudioNodeComponent({ id, data }: NodeProps) {
     });
 
     try {
-      const inputs = getNodeInputs(id, edges, nodeOutputs);
+      const inputs = getNodeInputs(id, edges, nodeOutputs, nodes);
       const prompt = inputs.prompt || inputs.text || "";
       const system = inputs.system || "";
 
@@ -161,7 +169,7 @@ function AudioNodeComponent({ id, data }: NodeProps) {
         error: msg,
       });
     }
-  }, [id, model, apiKey, edges, nodeOutputs, voice, format, setNodeOutput, updateNodeData]);
+  }, [id, model, apiKey, edges, nodes, nodeOutputs, voice, format, setNodeOutput, updateNodeData]);
 
   const handleDownload = useCallback(() => {
     if (!nodeOutput?.audio_url) return;
@@ -176,7 +184,24 @@ function AudioNodeComponent({ id, data }: NodeProps) {
       className={`min-w-[280px] rounded-lg border-2 ${borderColor} bg-studio-node shadow-lg relative`}
     >
       <div className="rounded-t-lg bg-pink-700 px-3 py-1.5 text-xs font-semibold text-white flex items-center justify-between gap-2">
-        <span>{nodeLabel}</span>
+        <span className="flex items-center gap-1 min-w-0">
+          {nodeLabel}
+          <NodeMediaHistoryButton
+            triggerClassName="h-6 w-6 p-0 text-pink-100 hover:text-white hover:bg-white/10"
+            nodeId={id}
+            kindFilter="generatedAudio"
+            onRestore={(blobId) => {
+              updateNodeData(id, {
+                generatedAudio: undefined,
+                generatedAudioBlobId: blobId,
+              });
+              setNodeOutput(id, {
+                audio_url: studioBlobFetchUrl(blobId),
+                status: "done",
+              });
+            }}
+          />
+        </span>
         <Input
           value={nodeLabel === "Audio Generation" ? "" : nodeLabel}
           onChange={(e) =>

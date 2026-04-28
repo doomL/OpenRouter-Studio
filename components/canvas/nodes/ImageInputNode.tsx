@@ -9,6 +9,8 @@ import { useStudioStore } from "@/lib/store";
 import { HandleLabel } from "@/components/canvas/HandleLabel";
 import { readJsonResponse } from "@/lib/read-json-response";
 import { fetchWithRetry, STUDIO_FETCH_MAX_ATTEMPTS } from "@/lib/fetch-with-retry";
+import { NodeMediaHistoryButton } from "@/components/studio/NodeMediaHistoryButton";
+import { pickInlineOrBlobUrl, studioBlobFetchUrl } from "@/lib/studio-node-media-url";
 
 function ImageInputNodeComponent({ id, data }: NodeProps) {
   const updateNodeData = useStudioStore((s) => s.updateNodeData);
@@ -18,7 +20,15 @@ function ImageInputNodeComponent({ id, data }: NodeProps) {
   const [loading, setLoading] = useState(false);
 
   const imagePreview =
-    (data.imagePreview as string) || (data.imageUrl as string) || "";
+    pickInlineOrBlobUrl(
+      (data.imagePreview as string) || undefined,
+      data.imagePreviewBlobId as string | undefined
+    ) ||
+    pickInlineOrBlobUrl(
+      (data.imageUrl as string) || undefined,
+      data.imageUrlBlobId as string | undefined
+    ) ||
+    "";
   const nodeLabel = (data.label as string) || "Image Input";
   const urlInput = (data.urlInput as string) || "";
 
@@ -109,8 +119,30 @@ function ImageInputNodeComponent({ id, data }: NodeProps) {
 
   return (
     <div className="min-w-[220px] max-w-[260px] rounded-lg border border-studio-node-border bg-studio-node shadow-lg relative">
-      <div className="rounded-t-lg bg-green-700 px-3 py-1.5 text-xs font-semibold text-white flex items-center justify-between">
-        <span>{nodeLabel}</span>
+      <div className="rounded-t-lg bg-green-700 px-3 py-1.5 text-xs font-semibold text-white flex items-center justify-between gap-2">
+        <span className="flex items-center gap-1 min-w-0">
+          {nodeLabel}
+          <NodeMediaHistoryButton
+            triggerClassName="h-6 w-6 p-0 text-green-100 hover:text-white hover:bg-white/10"
+            nodeId={id}
+            onRestore={(blobId, kind) => {
+              const patch: Record<string, unknown> = {
+                imagePreview: undefined,
+                imageUrl: undefined,
+                imagePreviewBlobId: undefined,
+                imageUrlBlobId: undefined,
+              };
+              if (kind === "imagePreview") patch.imagePreviewBlobId = blobId;
+              else if (kind === "imageUrl") patch.imageUrlBlobId = blobId;
+              else patch.imagePreviewBlobId = blobId;
+              updateNodeData(id, patch);
+              setNodeOutput(id, {
+                image_url: studioBlobFetchUrl(blobId),
+                status: "done",
+              });
+            }}
+          />
+        </span>
         <input
           className="bg-transparent text-right text-[10px] text-green-200 w-20 outline-none placeholder:text-green-300/50 nopan nodrag"
           value={nodeLabel === "Image Input" ? "" : nodeLabel}

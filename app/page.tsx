@@ -124,7 +124,7 @@ const plans = [
 export default async function LandingPage() {
   const session = await auth();
   if (session?.user) {
-    redirect("/studio");
+    redirect("/home");
   }
 
   return (

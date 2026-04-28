@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
 import { fetchFromOpenRouter } from "@/lib/openrouter";
 import { extractGeneratedImageUrl } from "@/lib/openrouter-image-response";
+import {
+  refUrlsNeedStudioAuth,
+  resolveImageUrlForOpenRouter,
+} from "@/lib/studio-blob-for-openrouter";
 
 /** Platforms that honor this (e.g. Vercel) won’t kill the function mid-generation. */
 export const maxDuration = 300;
@@ -38,16 +43,39 @@ export async function POST(req: NextRequest) {
       refUrls.push(image);
     }
 
+    const session = await auth();
+    const userId = session?.user?.id;
+
+    if (refUrlsNeedStudioAuth(refUrls) && !userId) {
+      return NextResponse.json(
+        {
+          error:
+            "Sign in is required to use Studio-saved blob images as references; OpenRouter cannot fetch private /api/studio/blobs URLs.",
+        },
+        { status: 401 }
+      );
+    }
+
+    let resolvedRefUrls: string[];
+    try {
+      resolvedRefUrls = await Promise.all(
+        refUrls.map((u) => resolveImageUrlForOpenRouter(u, userId))
+      );
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Failed to resolve reference images";
+      return NextResponse.json({ error: { message: msg } }, { status: 400 });
+    }
+
     const messages: Array<Record<string, unknown>> = [];
 
     // Reference image(s): text first, then each image (OpenRouter multimodal guidance).
-    if (refUrls.length > 0) {
+    if (resolvedRefUrls.length > 0) {
       const defaultWithRef =
         mode === "img2img" ? "Transform this image" : "Generate an image";
       const content: Array<Record<string, unknown>> = [
         { type: "text", text: prompt || defaultWithRef },
       ];
-      for (const url of refUrls) {
+      for (const url of resolvedRefUrls) {
         content.push({ type: "image_url", image_url: { url } });
       }
       messages.push({ role: "user", content });

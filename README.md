@@ -77,7 +77,30 @@ Prisma reads the migration URL from **`prisma.config.ts`** (typically the same `
 
 ## Docker
 
-Compose runs **PostgreSQL 16** (`postgres` service) and the **app** (`openrouter-studio`). Images use **Next.js standalone**. On each container start, **`docker-entrypoint.sh`** runs **`prisma migrate deploy`** so the schema exists before **`node server.js`**. The app process runs as **`nextjs`**.
+Compose runs **PostgreSQL 16** (`postgres`), **MinIO** (`minio`) for an S3-compatible API, a one-shot **`minio-init`** job that creates the default bucket, and the **app** (`openrouter-studio`). Images use **Next.js standalone**. On each container start, **`docker-entrypoint.sh`** runs **`prisma migrate deploy`** so the schema exists before **`node server.js`**. The app process runs as **`nextjs`**.
+
+The stack uses **`restart: unless-stopped`** on long-running services so it comes back after host reboots or process crashes (for example OOM). That reduces downtime but does not remove the need to keep API payloads small.
+
+Inside Compose, **`STUDIO_S3_*`** defaults point at **`http://minio:9000`** with bucket **`studio-media`** and credentials **`STUDIO_S3_ACCESS_KEY`** / **`STUDIO_S3_SECRET_KEY`** (change in **`.env`** for production). MinIO’s ports are bound to **loopback only** (`127.0.0.1`), so the Console is **`http://127.0.0.1:${MINIO_CONSOLE_PORT:-9001}`** and the S3 API **`http://127.0.0.1:${MINIO_PORT:-9000}`** from the host (not reachable from other machines). To use **external** S3 instead (managed AWS, another MinIO, Garage, etc.), set those variables in **`.env`** and remove or replace the `minio` / `minio-init` services and the app’s **`depends_on: minio-init`** in **`docker-compose.yml`**.
+
+### Node.js heap vs container RAM
+
+Compose sets **`NODE_OPTIONS=--max-old-space-size=4096`** as a reasonable default. That value is the **V8 old-generation heap ceiling in megabytes**, not “all memory used by the process.” Setting it **much lower** (for example 2048) **caps** the runtime on purpose. Setting it **far above** available RAM does not create physical memory and can make behavior worse. Tune it to roughly **75% of the memory you can afford** for the Node process.
+
+### Studio media blobs (S3 / MinIO)
+
+Heavy canvas media can be offloaded to **S3-compatible storage** so `PUT /api/settings/studio` stays small. **Docker Compose uses MinIO** by default; any compatible endpoint (AWS S3, Garage, etc.) works if you set the same variables.
+
+| Variable | Example |
+|----------|---------|
+| `STUDIO_S3_ENDPOINT` | `http://minio:9000` (app inside Compose) · `http://127.0.0.1:9000` (`npm run dev` on host) · or your external S3/MinIO URL |
+| `STUDIO_S3_REGION` | `us-east-1` (common for MinIO; many providers accept any non-empty string) |
+| `STUDIO_S3_BUCKET` | `studio-media` |
+| `STUDIO_S3_ACCESS_KEY` / `STUDIO_S3_SECRET_KEY` | API keys for that bucket |
+
+With these set, the server uploads inline `data:` payloads on save, stores **`…BlobId` fields** in `node.data`, and serves bytes from **`GET /api/studio/blobs/:id`**.
+
+One-shot migration for existing DB rows: **`npm run migrate:studio-blobs`** (requires the same env and a reachable bucket).
 
 **1. Environment**
 
@@ -87,7 +110,7 @@ cp .env.example .env
 
 Minimum in **`.env`**: **`AUTH_SECRET`**. Compose sets **`DATABASE_URL`** for the app to `postgresql://studio:…@postgres:5432/openrouter_studio` (password from **`POSTGRES_PASSWORD`** in `.env`, default `studio_secret`). For local development against Compose Postgres from the host, use **`localhost:5432`** in **`DATABASE_URL`** as in `.env.example`.
 
-Database files live in the **`postgres-data`** named volume and **persist across image rebuilds** and container recreation. To wipe the database, run **`docker compose down -v`**.
+Database and MinIO files live in the **`postgres-data`** and **`minio-data`** named volumes and **persist across image rebuilds** and container recreation. To wipe the database and object storage, run **`docker compose down -v`**.
 
 **2. Build and run**
 

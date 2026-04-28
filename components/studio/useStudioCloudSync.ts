@@ -1,27 +1,43 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { shallow } from "zustand/shallow";
 import { useSession } from "next-auth/react";
 import { signOutAtCurrentOrigin } from "@/lib/studio-sign-out";
 import { useStudioStore, type StudioServerSnapshot } from "@/lib/store";
 import { saveStudioSettingsToServer } from "@/lib/studio-settings-api";
 import { readJsonResponse } from "@/lib/read-json-response";
+import { buildLightLocalBackup } from "@/lib/studio-local-backup";
 import { toast } from "@/lib/toast";
 
-const DEBOUNCE_MS = 600;
+const DEBOUNCE_STRUCTURAL_MS = 600;
+/** Layout-only saves (drag, select): avoid hammering the server with full JSON. */
+const DEBOUNCE_LAYOUT_MS = 10_000;
 const LS_BACKUP_KEY = "or-studio-backup";
 
-/** Save lightweight state snapshot to localStorage as crash-recovery backup. */
+function selectCloudPersistSlice(state: ReturnType<typeof useStudioStore.getState>) {
+  return {
+    nodes: state.nodes,
+    edges: state.edges,
+    workflows: state.workflows,
+    videoJobs: state.videoJobs,
+    dynamicHandleCounts: state.dynamicHandleCounts,
+    apiKey: state.apiKey,
+    theme: state.theme,
+    cloudSaveMutationTier: state.cloudSaveMutationTier,
+  };
+}
+
+/** Save structure-first snapshot to localStorage (heavy media stripped — full state stays on server when synced). */
 function saveLocalBackup() {
   try {
     const s = useStudioStore.getState();
-    const backup = {
+    const backup = buildLightLocalBackup({
       nodes: s.nodes,
       edges: s.edges,
       workflows: s.workflows,
       dynamicHandleCounts: s.dynamicHandleCounts,
-      savedAt: Date.now(),
-    };
+    });
     localStorage.setItem(LS_BACKUP_KEY, JSON.stringify(backup));
   } catch {
     // QuotaExceededError or storage not available — ignore silently
@@ -47,6 +63,7 @@ export function useStudioCloudSync(): boolean {
   const { data: session, status } = useSession();
   const userId = session?.user?.id;
   const skipSave = useRef(true);
+  const ignoreNextCloudSchedule = useRef(false);
   const [cloudReady, setCloudReady] = useState(false);
 
   // Load server state and offer localStorage crash-recovery if applicable.
@@ -141,28 +158,52 @@ export function useStudioCloudSync(): boolean {
     };
   }, [status, userId]);
 
-  // Debounced cloud save + immediate localStorage backup on every state change.
+  // Debounced cloud save: structural changes flush quickly; layout-only (e.g. node drag) waits longer.
   useEffect(() => {
     if (status !== "authenticated" || !userId) return;
 
-    let timer: ReturnType<typeof setTimeout>;
+    let timer: ReturnType<typeof setTimeout> | undefined;
 
-    const save = () => {
-      saveLocalBackup();
-      void saveStudioSettingsToServer();
+    const scheduleSave = () => {
+      if (skipSave.current) return;
+      if (ignoreNextCloudSchedule.current) {
+        ignoreNextCloudSchedule.current = false;
+        return;
+      }
+      if (timer !== undefined) clearTimeout(timer);
+      const tier = useStudioStore.getState().cloudSaveMutationTier;
+      const delay =
+        tier === "structural" ? DEBOUNCE_STRUCTURAL_MS : DEBOUNCE_LAYOUT_MS;
+      timer = setTimeout(() => {
+        timer = undefined;
+        saveLocalBackup();
+        void saveStudioSettingsToServer().finally(() => {
+          ignoreNextCloudSchedule.current = true;
+          useStudioStore.getState().resetCloudSaveTier();
+        });
+      }, delay);
     };
 
-    const unsub = useStudioStore.subscribe(() => {
-      if (skipSave.current) return;
-      clearTimeout(timer);
-      timer = setTimeout(save, DEBOUNCE_MS);
+    let prevCloudSlice = selectCloudPersistSlice(useStudioStore.getState());
+    const unsub = useStudioStore.subscribe((state) => {
+      if (state.studioRemoteEchoSuppression > 0) return;
+      const nextSlice = selectCloudPersistSlice(state);
+      if (shallow(prevCloudSlice, nextSlice)) return;
+      prevCloudSlice = nextSlice;
+      scheduleSave();
     });
 
     const flush = () => {
       if (skipSave.current) return;
-      clearTimeout(timer);
+      if (timer !== undefined) {
+        clearTimeout(timer);
+        timer = undefined;
+      }
       saveLocalBackup();
-      void saveStudioSettingsToServer(undefined, { keepalive: true });
+      void saveStudioSettingsToServer(undefined, { keepalive: true }).finally(() => {
+        ignoreNextCloudSchedule.current = true;
+        useStudioStore.getState().resetCloudSaveTier();
+      });
     };
 
     const onVisibility = () => {
@@ -174,12 +215,15 @@ export function useStudioCloudSync(): boolean {
     document.addEventListener("visibilitychange", onVisibility);
 
     return () => {
-      clearTimeout(timer);
+      if (timer !== undefined) clearTimeout(timer);
       unsub();
       window.removeEventListener("pagehide", onPageHide);
       document.removeEventListener("visibilitychange", onVisibility);
       if (!skipSave.current) {
-        void saveStudioSettingsToServer();
+        ignoreNextCloudSchedule.current = true;
+        void saveStudioSettingsToServer().finally(() => {
+          useStudioStore.getState().resetCloudSaveTier();
+        });
       }
     };
   }, [status, userId]);

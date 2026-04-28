@@ -10,6 +10,8 @@ import { useStudioStore } from "@/lib/store";
 import { HandleLabel } from "@/components/canvas/HandleLabel";
 import { readJsonResponse } from "@/lib/read-json-response";
 import { fetchWithRetry, STUDIO_FETCH_MAX_ATTEMPTS } from "@/lib/fetch-with-retry";
+import { NodeMediaHistoryButton } from "@/components/studio/NodeMediaHistoryButton";
+import { pickInlineOrBlobUrl, studioBlobFetchUrl } from "@/lib/studio-node-media-url";
 
 type MediaType = "none" | "image" | "video";
 
@@ -20,7 +22,16 @@ function MediaInputNodeComponent({ id, data }: NodeProps) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
 
-  const preview = (data.preview as string) || "";
+  const preview =
+    pickInlineOrBlobUrl(
+      (data.preview as string) || undefined,
+      data.previewBlobId as string | undefined
+    ) || "";
+  const videoDataResolved =
+    pickInlineOrBlobUrl(
+      (data.videoDataUrl as string) || undefined,
+      data.videoDataUrlBlobId as string | undefined
+    ) || "";
   const mediaType = (data.mediaType as MediaType) || "none";
   const nodeLabel = (data.label as string) || "Media Input";
   const urlInput = (data.urlInput as string) || "";
@@ -153,10 +164,12 @@ function MediaInputNodeComponent({ id, data }: NodeProps) {
   const handleClear = useCallback(() => {
     updateNodeData(id, {
       preview: "",
+      previewBlobId: undefined,
       mediaType: "none",
       fileName: "",
       urlInput: "",
       videoDataUrl: "",
+      videoDataUrlBlobId: undefined,
     });
     setNodeOutput(id, { status: "idle" });
   }, [id, updateNodeData, setNodeOutput]);
@@ -167,6 +180,35 @@ function MediaInputNodeComponent({ id, data }: NodeProps) {
         <div className="flex items-center gap-1.5">
           <UploadIcon className="size-3" />
           <span>{nodeLabel}</span>
+          <NodeMediaHistoryButton
+            triggerClassName="h-6 w-6 p-0 text-teal-100 hover:text-white hover:bg-white/10"
+            nodeId={id}
+            onRestore={(blobId, kind) => {
+              if (kind === "preview") {
+                updateNodeData(id, {
+                  preview: undefined,
+                  previewBlobId: blobId,
+                  mediaType: "image",
+                });
+                setNodeOutput(id, {
+                  image_url: studioBlobFetchUrl(blobId),
+                  status: "done",
+                });
+              } else if (kind === "videoDataUrl") {
+                const u = studioBlobFetchUrl(blobId);
+                updateNodeData(id, {
+                  videoDataUrl: undefined,
+                  videoDataUrlBlobId: blobId,
+                  preview: u,
+                  mediaType: "video",
+                });
+                setNodeOutput(id, {
+                  video_url: u,
+                  status: "done",
+                });
+              }
+            }}
+          />
         </div>
         <input
           className="bg-transparent text-right text-[10px] text-teal-200 w-20 outline-none placeholder:text-teal-300/50 nopan nodrag"
@@ -187,9 +229,9 @@ function MediaInputNodeComponent({ id, data }: NodeProps) {
         >
           {mediaType === "image" && preview ? (
             <img src={preview} alt="preview" className="h-full w-full object-cover" />
-          ) : mediaType === "video" && preview ? (
+          ) : mediaType === "video" && (preview || videoDataResolved) ? (
             <video
-              src={preview}
+              src={preview || videoDataResolved}
               className="h-full w-full object-cover"
               muted
               playsInline

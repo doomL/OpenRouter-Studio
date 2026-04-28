@@ -13,6 +13,8 @@ import { HandleLabel } from "@/components/canvas/HandleLabel";
 import { readJsonResponse } from "@/lib/read-json-response";
 import { fetchWithRetry, STUDIO_FETCH_MAX_ATTEMPTS } from "@/lib/fetch-with-retry";
 import { modalitiesForImageRequest } from "@/lib/models";
+import { NodeMediaHistoryButton } from "@/components/studio/NodeMediaHistoryButton";
+import { pickInlineOrBlobUrl, studioBlobFetchUrl } from "@/lib/studio-node-media-url";
 
 const DEFAULT_PROMPT =
   "Place the subject on a flat solid chroma background, with sharp subject boundaries and no shadows.";
@@ -86,6 +88,7 @@ function BackgroundRemovalNodeComponent({ id, data }: NodeProps) {
   const setNodeOutput = useStudioStore((s) => s.setNodeOutput);
   const nodeOutput = useStudioStore((s) => s.nodeOutputs[id]);
   const edges = useStudioStore((s) => s.edges);
+  const nodes = useStudioStore((s) => s.nodes);
   const nodeOutputs = useStudioStore((s) => s.nodeOutputs);
   const apiKey = useStudioStore((s) => s.apiKey);
 
@@ -95,7 +98,11 @@ function BackgroundRemovalNodeComponent({ id, data }: NodeProps) {
   const keyColor = (data.keyColor as string) || "#00ff00";
   const tolerance = Number(data.tolerance ?? 35);
   const softness = Number(data.softness ?? 30);
-  const preKeyImage = (data.preKeyImage as string) || "";
+  const preKeyImage =
+    pickInlineOrBlobUrl(
+      data.preKeyImage as string | undefined,
+      data.preKeyImageBlobId as string | undefined
+    ) || "";
   const autoPreview = data.autoPreview !== false;
 
   const status = nodeOutput?.status || "idle";
@@ -142,7 +149,7 @@ function BackgroundRemovalNodeComponent({ id, data }: NodeProps) {
 
   const run = useCallback(async () => {
     if (!model || !apiKey) return;
-    const inputs = getNodeInputs(id, edges, nodeOutputs);
+    const inputs = getNodeInputs(id, edges, nodeOutputs, nodes);
     const sourceImage = inputs.image_url;
     if (!sourceImage) {
       setNodeOutput(id, { status: "error", error: "No image input connected" });
@@ -233,6 +240,7 @@ function BackgroundRemovalNodeComponent({ id, data }: NodeProps) {
     apiKey,
     id,
     edges,
+    nodes,
     nodeOutputs,
     instruction,
     keyColor,
@@ -247,7 +255,24 @@ function BackgroundRemovalNodeComponent({ id, data }: NodeProps) {
       className={`min-w-[260px] rounded-lg border-2 ${borderColor} bg-studio-node shadow-lg relative`}
     >
       <div className="rounded-t-lg bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white flex items-center justify-between gap-2">
-        <span>{nodeLabel}</span>
+        <span className="flex items-center gap-1 min-w-0">
+          {nodeLabel}
+          <NodeMediaHistoryButton
+            triggerClassName="h-6 w-6 p-0 text-emerald-100 hover:text-white hover:bg-white/10"
+            nodeId={id}
+            kindFilter="outputImage"
+            onRestore={(blobId) => {
+              updateNodeData(id, {
+                outputImage: undefined,
+                outputImageBlobId: blobId,
+              });
+              setNodeOutput(id, {
+                image_url: studioBlobFetchUrl(blobId),
+                status: "done",
+              });
+            }}
+          />
+        </span>
         <Input
           value={nodeLabel === "Background Remove" ? "" : nodeLabel}
           onChange={(e) =>
