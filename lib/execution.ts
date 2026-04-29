@@ -1,5 +1,6 @@
 import { type Edge, type Node } from "@xyflow/react";
 import { imageUrlFromPersistedNodeData } from "@/lib/canvas-handles";
+import { pickInlineOrBlobUrl } from "@/lib/studio-node-media-url";
 import { type NodeOutput } from "./store";
 
 function hasUsefulText(v: string | undefined): boolean {
@@ -52,6 +53,51 @@ function mergeSourceOutputWithNodeData(
       ...(base ?? {}),
       text: hasUsefulText(base?.text) ? base!.text : persisted ?? base?.text ?? "",
       status: base?.status ?? "done",
+    };
+  }
+
+  if (srcNode.type === "transcribe") {
+    const d = srcNode.data as Record<string, unknown>;
+    const t = d.transcript;
+    const persisted = typeof t === "string" && t.length > 0 ? t : undefined;
+    if (!hasUsefulText(base?.text) && !persisted && !base) return undefined;
+    return {
+      ...(base ?? {}),
+      text: hasUsefulText(base?.text) ? base!.text : persisted ?? base?.text ?? "",
+      status: base?.status ?? "done",
+    };
+  }
+
+  if (srcNode.type === "videoGen") {
+    const d = srcNode.data as Record<string, unknown>;
+    const persisted = pickInlineOrBlobUrl(
+      d.outputVideoDataUrl as string | undefined,
+      d.outputVideoDataUrlBlobId as string | undefined
+    );
+    const videoUrl = base?.video_url ?? persisted;
+    if (!videoUrl) return base;
+    return {
+      ...(base ?? {}),
+      video_url: videoUrl,
+      status: base?.status === "error" ? "error" : (base?.status ?? "done"),
+    };
+  }
+
+  if (srcNode.type === "mediaInput") {
+    const d = srcNode.data as Record<string, unknown>;
+    if (d.mediaType !== "audio") return base;
+    const fromBlob = pickInlineOrBlobUrl(
+      d.audioDataUrl as string | undefined,
+      d.audioDataUrlBlobId as string | undefined
+    );
+    const urlInput = typeof d.urlInput === "string" ? d.urlInput.trim() : "";
+    const audioUrl =
+      base?.audio_url ?? fromBlob ?? (urlInput.match(/^https?:\/\//) ? urlInput : undefined);
+    if (!audioUrl) return base;
+    return {
+      ...(base ?? {}),
+      audio_url: audioUrl,
+      status: base?.status === "error" ? "error" : (base?.status ?? "done"),
     };
   }
 

@@ -5,15 +5,16 @@ import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { UploadIcon } from "lucide-react";
+import { LibraryIcon, UploadIcon } from "lucide-react";
 import { useStudioStore } from "@/lib/store";
 import { HandleLabel } from "@/components/canvas/HandleLabel";
 import { readJsonResponse } from "@/lib/read-json-response";
 import { fetchWithRetry, STUDIO_FETCH_MAX_ATTEMPTS } from "@/lib/fetch-with-retry";
 import { NodeMediaHistoryButton } from "@/components/studio/NodeMediaHistoryButton";
+import { StudioMediaPickerDialog } from "@/components/studio/StudioMediaPickerDialog";
 import { pickInlineOrBlobUrl, studioBlobFetchUrl } from "@/lib/studio-node-media-url";
 
-type MediaType = "none" | "image" | "video";
+type MediaType = "none" | "image" | "video" | "audio";
 
 function MediaInputNodeComponent({ id, data }: NodeProps) {
   const updateNodeData = useStudioStore((s) => s.updateNodeData);
@@ -21,6 +22,7 @@ function MediaInputNodeComponent({ id, data }: NodeProps) {
   const apiKey = useStudioStore((s) => s.apiKey);
   const fileRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
+  const [libraryOpen, setLibraryOpen] = useState(false);
 
   const preview =
     pickInlineOrBlobUrl(
@@ -31,6 +33,11 @@ function MediaInputNodeComponent({ id, data }: NodeProps) {
     pickInlineOrBlobUrl(
       (data.videoDataUrl as string) || undefined,
       data.videoDataUrlBlobId as string | undefined
+    ) || "";
+  const audioResolved =
+    pickInlineOrBlobUrl(
+      (data.audioDataUrl as string) || undefined,
+      data.audioDataUrlBlobId as string | undefined
     ) || "";
   const mediaType = (data.mediaType as MediaType) || "none";
   const nodeLabel = (data.label as string) || "Media Input";
@@ -45,8 +52,9 @@ function MediaInputNodeComponent({ id, data }: NodeProps) {
 
       const isVideo = file.type.startsWith("video/");
       const isImage = file.type.startsWith("image/");
-      if (!isVideo && !isImage) {
-        alert("Unsupported file type. Use image or video files.");
+      const isAudio = file.type.startsWith("audio/");
+      if (!isVideo && !isImage && !isAudio) {
+        alert("Unsupported file type. Use image, video, or audio files.");
         return;
       }
 
@@ -63,10 +71,28 @@ function MediaInputNodeComponent({ id, data }: NodeProps) {
           preview: dataUrl,
           mediaType: "image",
           fileName: file.name,
+          audioDataUrl: "",
+          audioDataUrlBlobId: undefined,
         });
         setNodeOutput(id, {
           image_url: dataUrl,
           image_base64: base64,
+          status: "done",
+        });
+      } else if (isAudio) {
+        updateNodeData(id, {
+          preview: "",
+          previewBlobId: undefined,
+          mediaType: "audio",
+          fileName: file.name,
+          videoDataUrl: "",
+          videoDataUrlBlobId: undefined,
+          audioDataUrl: dataUrl,
+          audioDataUrlBlobId: undefined,
+          urlInput: "",
+        });
+        setNodeOutput(id, {
+          audio_url: dataUrl,
           status: "done",
         });
       } else {
@@ -77,6 +103,8 @@ function MediaInputNodeComponent({ id, data }: NodeProps) {
           mediaType: "video",
           fileName: file.name,
           videoDataUrl: dataUrl,
+          audioDataUrl: "",
+          audioDataUrlBlobId: undefined,
         });
         setNodeOutput(id, {
           video_url: blobUrl,
@@ -106,19 +134,35 @@ function MediaInputNodeComponent({ id, data }: NodeProps) {
 
   const handleUrlSet = useCallback(() => {
     if (!urlInput) return;
-    // Try to detect if it's a video URL
     const isVideo = /\.(mp4|webm|mov|avi)(\?|$)/i.test(urlInput);
+    const isAudio = /\.(mp3|wav|ogg|m4a|aac|flac|opus|webm)(\?|$)/i.test(urlInput);
 
     if (isVideo) {
       updateNodeData(id, {
         preview: urlInput,
         mediaType: "video",
+        audioDataUrl: "",
+        audioDataUrlBlobId: undefined,
       });
       setNodeOutput(id, { video_url: urlInput, status: "done" });
+    } else if (isAudio) {
+      updateNodeData(id, {
+        preview: "",
+        previewBlobId: undefined,
+        mediaType: "audio",
+        videoDataUrl: "",
+        videoDataUrlBlobId: undefined,
+        audioDataUrl: "",
+        audioDataUrlBlobId: undefined,
+        urlInput,
+      });
+      setNodeOutput(id, { audio_url: urlInput, status: "done" });
     } else {
       updateNodeData(id, {
         preview: urlInput,
         mediaType: "image",
+        audioDataUrl: "",
+        audioDataUrlBlobId: undefined,
       });
       setNodeOutput(id, { image_url: urlInput, status: "done" });
     }
@@ -161,6 +205,62 @@ function MediaInputNodeComponent({ id, data }: NodeProps) {
     }
   }, [id, urlInput, mediaType, apiKey, updateNodeData, setNodeOutput]);
 
+  const handleLibraryPick = useCallback(
+    (blobId: string, mimeType: string) => {
+      const url = studioBlobFetchUrl(blobId);
+      if (mimeType.startsWith("image/")) {
+        updateNodeData(id, {
+          preview: undefined,
+          previewBlobId: blobId,
+          mediaType: "image",
+          fileName: "From library",
+          urlInput: "",
+          videoDataUrl: "",
+          videoDataUrlBlobId: undefined,
+          audioDataUrl: "",
+          audioDataUrlBlobId: undefined,
+        });
+        setNodeOutput(id, {
+          image_url: url,
+          status: "done",
+        });
+      } else if (mimeType.startsWith("video/")) {
+        updateNodeData(id, {
+          preview: url,
+          videoDataUrl: undefined,
+          videoDataUrlBlobId: blobId,
+          mediaType: "video",
+          fileName: "From library",
+          urlInput: "",
+          previewBlobId: undefined,
+          audioDataUrl: "",
+          audioDataUrlBlobId: undefined,
+        });
+        setNodeOutput(id, {
+          video_url: url,
+          status: "done",
+        });
+      } else if (mimeType.startsWith("audio/")) {
+        updateNodeData(id, {
+          preview: "",
+          previewBlobId: undefined,
+          videoDataUrl: "",
+          videoDataUrlBlobId: undefined,
+          mediaType: "audio",
+          fileName: "From library",
+          urlInput: "",
+          audioDataUrl: undefined,
+          audioDataUrlBlobId: blobId,
+        });
+        setNodeOutput(id, {
+          audio_url: url,
+          status: "done",
+        });
+      }
+    },
+    [id, updateNodeData, setNodeOutput]
+  );
+
   const handleClear = useCallback(() => {
     updateNodeData(id, {
       preview: "",
@@ -170,6 +270,8 @@ function MediaInputNodeComponent({ id, data }: NodeProps) {
       urlInput: "",
       videoDataUrl: "",
       videoDataUrlBlobId: undefined,
+      audioDataUrl: "",
+      audioDataUrlBlobId: undefined,
     });
     setNodeOutput(id, { status: "idle" });
   }, [id, updateNodeData, setNodeOutput]);
@@ -204,6 +306,21 @@ function MediaInputNodeComponent({ id, data }: NodeProps) {
                 });
                 setNodeOutput(id, {
                   video_url: u,
+                  status: "done",
+                });
+              } else if (kind === "audioDataUrl") {
+                const u = studioBlobFetchUrl(blobId);
+                updateNodeData(id, {
+                  audioDataUrl: undefined,
+                  audioDataUrlBlobId: blobId,
+                  preview: "",
+                  previewBlobId: undefined,
+                  videoDataUrl: "",
+                  videoDataUrlBlobId: undefined,
+                  mediaType: "audio",
+                });
+                setNodeOutput(id, {
+                  audio_url: u,
                   status: "done",
                 });
               }
@@ -242,20 +359,55 @@ function MediaInputNodeComponent({ id, data }: NodeProps) {
                 v.currentTime = 0;
               }}
             />
+          ) : mediaType === "audio" && (audioResolved || urlInput) ? (
+            <audio
+              controls
+              src={audioResolved || urlInput}
+              className="w-full max-h-full"
+            />
           ) : (
             <div className="flex flex-col items-center gap-1.5 text-muted-foreground">
               <UploadIcon className="size-6 opacity-50" />
-              <span className="text-xs">Drop image or video</span>
-              <span className="text-[10px] opacity-60">PNG, JPG, MP4, WEBM...</span>
+              <span className="text-xs">Drop, Library, or Upload</span>
+              <span className="text-[10px] opacity-60">Image, video, or audio</span>
             </div>
           )}
         </div>
         <input
           ref={fileRef}
           type="file"
-          accept="image/png,image/jpeg,image/webp,image/gif,video/mp4,video/webm,video/quicktime"
+          accept="image/png,image/jpeg,image/webp,image/gif,video/mp4,video/webm,video/quicktime,audio/mpeg,audio/wav,audio/mp4,audio/webm,audio/ogg,audio/flac"
           className="hidden"
           onChange={handleFileChange}
+        />
+
+        <div className="flex gap-1">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-7 flex-1 text-[10px] gap-1 px-2"
+            onClick={() => setLibraryOpen(true)}
+          >
+            <LibraryIcon className="size-3 shrink-0" />
+            Library
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-7 flex-1 text-[10px]"
+            onClick={() => fileRef.current?.click()}
+          >
+            <UploadIcon className="size-3 inline mr-0.5" />
+            Upload
+          </Button>
+        </div>
+
+        <StudioMediaPickerDialog
+          open={libraryOpen}
+          onOpenChange={setLibraryOpen}
+          onPick={handleLibraryPick}
         />
 
         {/* File name */}
@@ -296,27 +448,37 @@ function MediaInputNodeComponent({ id, data }: NodeProps) {
         {/* Media type badge */}
         {mediaType !== "none" && (
           <div className="flex items-center gap-1">
-            <span className={`inline-block px-1.5 py-0.5 rounded text-[9px] font-medium ${
-              mediaType === "image" ? "bg-green-900/40 text-green-400" : "bg-blue-900/40 text-blue-400"
-            }`}>
-              {mediaType === "image" ? "IMAGE" : "VIDEO"}
+            <span
+              className={`inline-block px-1.5 py-0.5 rounded text-[9px] font-medium ${
+                mediaType === "image"
+                  ? "bg-green-900/40 text-green-400"
+                  : mediaType === "video"
+                    ? "bg-blue-900/40 text-blue-400"
+                    : "bg-amber-900/40 text-amber-400"
+              }`}
+            >
+              {mediaType === "image" ? "IMAGE" : mediaType === "video" ? "VIDEO" : "AUDIO"}
             </span>
           </div>
         )}
       </div>
 
       {/* Output handles */}
-      <Handle type="source" position={Position.Right} id="image_url" style={{ top: "35%" }}
+      <Handle type="source" position={Position.Right} id="image_url" style={{ top: "28%" }}
         className="!w-3 !h-3 !bg-green-500 !border-2 !border-green-700" />
-      <HandleLabel label="image url" side="right" top="35%" />
+      <HandleLabel label="image url" side="right" top="28%" />
 
-      <Handle type="source" position={Position.Right} id="image_base64" style={{ top: "50%" }}
+      <Handle type="source" position={Position.Right} id="image_base64" style={{ top: "40%" }}
         className="!w-3 !h-3 !bg-green-400 !border-2 !border-green-700" />
-      <HandleLabel label="base64" side="right" top="50%" />
+      <HandleLabel label="base64" side="right" top="40%" />
 
-      <Handle type="source" position={Position.Right} id="video_url" style={{ top: "65%" }}
+      <Handle type="source" position={Position.Right} id="video_url" style={{ top: "52%" }}
         className="!w-3 !h-3 !bg-blue-400 !border-2 !border-blue-600" />
-      <HandleLabel label="video url" side="right" top="65%" />
+      <HandleLabel label="video url" side="right" top="52%" />
+
+      <Handle type="source" position={Position.Right} id="audio_url" style={{ top: "64%" }}
+        className="!w-3 !h-3 !bg-amber-500 !border-2 !border-amber-700" />
+      <HandleLabel label="audio url" side="right" top="64%" />
     </div>
   );
 }

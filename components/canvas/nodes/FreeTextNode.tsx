@@ -61,13 +61,15 @@ function FreeTextNodeComponent({ id, data, selected }: NodeProps) {
     }
   }, [text]);
 
-  const syncShellToNodeSize = useCallback(() => {
+  /** Sync React Flow node bounds to the content box (not the RF wrapper), so the outline/hit area matches visible text. */
+  const syncNodeSizeToContent = useCallback(() => {
     if (resizingRef.current) return;
-    const el = shellRef.current;
-    if (!el) return;
-    const rect = el.getBoundingClientRect();
-    const nextW = Math.max(48, Math.ceil(rect.width));
-    const nextH = Math.max(24, Math.ceil(rect.height));
+    const editor = editorRef.current;
+    if (!editor) return;
+    // scrollWidth/scrollHeight reflect full content even when the RF parent still has stale width/height.
+    const pad = 2;
+    const nextW = Math.max(48, Math.ceil(editor.scrollWidth + pad));
+    const nextH = Math.max(24, Math.ceil(editor.scrollHeight + pad));
 
     const { nodes } = useStudioStore.getState();
     const node = nodes.find((n) => n.id === id);
@@ -100,15 +102,19 @@ function FreeTextNodeComponent({ id, data, selected }: NodeProps) {
   }, [id, setNodes, updateNodeInternals]);
 
   useLayoutEffect(() => {
-    const el = shellRef.current;
+    const el = editorRef.current;
     if (!el) return;
     const ro = new ResizeObserver(() => {
-      syncShellToNodeSize();
+      syncNodeSizeToContent();
     });
     ro.observe(el);
-    syncShellToNodeSize();
+    syncNodeSizeToContent();
     return () => ro.disconnect();
-  }, [syncShellToNodeSize]);
+  }, [syncNodeSizeToContent]);
+
+  useLayoutEffect(() => {
+    syncNodeSizeToContent();
+  }, [fontSize, text, syncNodeSizeToContent]);
 
   const readFontFromStore = useCallback(() => {
     const node = useStudioStore.getState().nodes.find((n) => n.id === id);
@@ -156,9 +162,9 @@ function FreeTextNodeComponent({ id, data, selected }: NodeProps) {
     resizingRef.current = false;
     requestAnimationFrame(() => {
       updateNodeInternals(id);
-      syncShellToNodeSize();
+      syncNodeSizeToContent();
     });
-  }, [id, syncShellToNodeSize, updateNodeInternals]);
+  }, [id, syncNodeSizeToContent, updateNodeInternals]);
 
   return (
     <>
@@ -191,7 +197,7 @@ function FreeTextNodeComponent({ id, data, selected }: NodeProps) {
         )}
         <div
           ref={editorRef}
-          className="studio-freetext-editable nodrag nopan relative z-10 min-h-[1.2em] min-w-[2ch] max-w-[min(100vw-2rem,96vw)] cursor-text whitespace-pre-wrap break-words text-foreground outline-none"
+          className="studio-freetext-editable nodrag nopan relative z-10 inline-block min-h-[1.2em] min-w-[2ch] max-w-[min(100vw-2rem,96vw)] cursor-text whitespace-pre-wrap align-top break-words text-foreground outline-none"
           contentEditable
           suppressContentEditableWarning
           style={{

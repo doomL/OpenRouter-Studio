@@ -1,5 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
 import { fetchFromOpenRouter } from "@/lib/openrouter";
+import {
+  normalizeVideoImageRefsInBody,
+  videoBodyReferencesStudioBlobs,
+} from "@/lib/openrouter-normalize-vision-urls";
+
+/** Inlining blob images to data URLs can take time for large references. */
+export const maxDuration = 300;
 
 // POST — submit video generation job
 export async function POST(req: NextRequest) {
@@ -9,7 +17,29 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const body = await req.json();
+    const body = (await req.json()) as Record<string, unknown>;
+    const session = await auth();
+    const userId = session?.user?.id;
+
+    if (videoBodyReferencesStudioBlobs(body) && !userId) {
+      return NextResponse.json(
+        {
+          error: {
+            message:
+              "Sign in is required when using Studio library images as video frames or references; OpenRouter cannot fetch private /api/studio/blobs URLs.",
+          },
+        },
+        { status: 401 }
+      );
+    }
+
+    try {
+      await normalizeVideoImageRefsInBody(body, userId);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Failed to resolve reference images";
+      return NextResponse.json({ error: { message: msg } }, { status: 400 });
+    }
+
     const res = await fetchFromOpenRouter("/v1/videos", apiKey, {
       method: "POST",
       body: JSON.stringify(body),

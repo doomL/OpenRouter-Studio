@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useCallback, useEffect } from "react";
+import { memo, useCallback, useEffect, useMemo } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,11 +41,25 @@ function AudioNodeComponent({ id, data }: NodeProps) {
   const nodes = useStudioStore((s) => s.nodes);
   const nodeOutputs = useStudioStore((s) => s.nodeOutputs);
   const apiKey = useStudioStore((s) => s.apiKey);
+  const models = useStudioStore((s) => s.models);
 
   const model = (data.model as string) || "";
   const nodeLabel = (data.label as string) || "Audio Generation";
   const voice = (data.voice as string) || "";
   const format = (data.format as string) || "wav";
+
+  const voiceOptions = useMemo((): string[] => {
+    const info = models?.audio.find((m) => m.id === model);
+    const v = info?.supported_tts_voices;
+    return Array.isArray(v) && v.length > 0 ? v : [];
+  }, [models, model]);
+
+  useEffect(() => {
+    if (voiceOptions.length === 0) return;
+    if (!voice || !voiceOptions.includes(voice)) {
+      updateNodeData(id, { voice: voiceOptions[0]! });
+    }
+  }, [id, voice, voiceOptions, updateNodeData]);
 
   useEffect(() => {
     const audioUrl = pickInlineOrBlobUrl(
@@ -103,9 +117,16 @@ function AudioNodeComponent({ id, data }: NodeProps) {
       messages.push({ role: "user", content: prompt });
 
       const audioPayload: Record<string, string> = { format };
-      const v = voice.trim();
-      if (v) {
-        audioPayload.voice = v;
+      const modelInfo = useStudioStore.getState().models?.audio.find((x) => x.id === model);
+      const listedVoices = modelInfo?.supported_tts_voices;
+      let effectiveVoice = voice.trim();
+      if (Array.isArray(listedVoices) && listedVoices.length > 0) {
+        if (!effectiveVoice || !listedVoices.includes(effectiveVoice)) {
+          effectiveVoice = listedVoices[0]!;
+        }
+      }
+      if (effectiveVoice) {
+        audioPayload.voice = effectiveVoice;
       }
 
       const res = await fetchWithRetry(
@@ -216,28 +237,66 @@ function AudioNodeComponent({ id, data }: NodeProps) {
         <ModelSelector
           category="audio"
           value={model}
-          onChange={(v) => updateNodeData(id, { model: v })}
+          onChange={(v) => {
+            const opts =
+              useStudioStore.getState().models?.audio.find((m) => m.id === v)
+                ?.supported_tts_voices ?? [];
+            const pick =
+              Array.isArray(opts) && opts.length > 0 && typeof opts[0] === "string"
+                ? opts[0]
+                : "";
+            updateNodeData(id, { model: v, voice: pick });
+          }}
         />
 
         <div>
           <Label className="text-xs text-muted-foreground">
-            Voice <span className="font-normal opacity-70">(optional)</span>
+            Voice {voiceOptions.length > 0 && <span className="opacity-60">(model)</span>}
           </Label>
-          <p className="text-[9px] text-muted-foreground/90 leading-snug mb-1">
-            Only some models use this (often OpenAI-style audio). Leave empty if unsure.
-          </p>
-          <Input
-            value={voice}
-            onChange={(e) => updateNodeData(id, { voice: e.target.value })}
-            list={`openrouter-audio-voice-hints-${id}`}
-            placeholder="e.g. alloy, or provider-specific id"
-            className="h-7 text-xs bg-studio-node-input border-studio-node-border"
-          />
-          <datalist id={`openrouter-audio-voice-hints-${id}`}>
-            {OPENAI_STYLE_VOICE_HINTS.map((item) => (
-              <option key={item} value={item} />
-            ))}
-          </datalist>
+          {voiceOptions.length > 0 ? (
+            <>
+              <p className="text-[9px] text-muted-foreground/90 leading-snug mb-1">
+                From OpenRouter <code className="text-[9px]">supported_tts_voices</code> for this
+                model.
+              </p>
+              <Select
+                value={
+                  voice && voiceOptions.includes(voice) ? voice : voiceOptions[0]!
+                }
+                onValueChange={(v) => v && updateNodeData(id, { voice: v })}
+              >
+                <SelectTrigger className="h-7 text-xs bg-studio-node-input border-studio-node-border mt-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="max-h-[280px]" {...getCanvasSelectContentProps()}>
+                  {voiceOptions.map((item) => (
+                    <SelectItem key={item} value={item} className="text-xs">
+                      {item}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </>
+          ) : (
+            <>
+              <p className="text-[9px] text-muted-foreground/90 leading-snug mb-1">
+                No voice list from the API for this model — enter a provider voice id, or leave
+                empty where optional.
+              </p>
+              <Input
+                value={voice}
+                onChange={(e) => updateNodeData(id, { voice: e.target.value })}
+                list={`openrouter-audio-voice-hints-${id}`}
+                placeholder="e.g. alloy, or provider-specific id"
+                className="h-7 text-xs bg-studio-node-input border-studio-node-border"
+              />
+              <datalist id={`openrouter-audio-voice-hints-${id}`}>
+                {OPENAI_STYLE_VOICE_HINTS.map((item) => (
+                  <option key={item} value={item} />
+                ))}
+              </datalist>
+            </>
+          )}
         </div>
 
         <div>
@@ -262,6 +321,11 @@ function AudioNodeComponent({ id, data }: NodeProps) {
         <p className="text-[10px] text-muted-foreground leading-snug">
           Connect a prompt or LLM text output to generate spoken audio. Models that support
           music or song generation can also be used here via the custom model picker.
+        </p>
+        <p className="text-[10px] text-muted-foreground/85 leading-snug">
+          Models with <code className="text-[9px]">-tts-</code> in the id use OpenRouter&apos;s
+          dedicated <code className="text-[9px]">/audio/speech</code> endpoint automatically; others
+          use streaming chat completions.
         </p>
         <p className="text-[10px] text-muted-foreground/80 leading-snug">
           Some providers only allow streaming audio as <code>pcm16</code>. When that

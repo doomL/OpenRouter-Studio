@@ -40,7 +40,13 @@ export function getExecutionOrder(nodes: Node[], edges: Edge[]): string[] {
 }
 
 /** Node types that are executable (have a "Run" or "Generate" button) */
-const EXECUTABLE_TYPES = new Set(["llm", "imageGen", "videoGen", "audioGen"]);
+const EXECUTABLE_TYPES = new Set([
+  "llm",
+  "imageGen",
+  "videoGen",
+  "audioGen",
+  "transcribe",
+]);
 
 /** Filter execution order to only runnable nodes */
 export function getRunnableNodes(nodes: Node[], edges: Edge[]): Node[] {

@@ -22,10 +22,11 @@ type ModelsApiPayload = {
   image?: Model[];
   video?: Model[];
   audio?: Model[];
+  transcribe?: Model[];
 };
 
 interface ModelSelectorProps {
-  category: "text" | "image" | "video" | "audio";
+  category: "text" | "image" | "video" | "audio" | "transcribe";
   value: string;
   onChange: (value: string) => void;
 }
@@ -53,6 +54,7 @@ export function ModelSelector({ category, value, onChange }: ModelSelectorProps)
             image: data.image ?? [],
             video: data.video ?? [],
             audio: data.audio ?? [],
+            transcribe: data.transcribe ?? [],
           });
         }
       })

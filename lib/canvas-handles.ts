@@ -36,6 +36,32 @@ export function imageUrlFromPersistedNodeData(node: Node | undefined): string | 
   }
 }
 
+/** Playable video URL from `node.data` when `nodeOutputs` is empty (persisted / after sync). */
+export function videoUrlFromPersistedNodeData(node: Node | undefined): string | undefined {
+  if (!node) return undefined;
+  const d = node.data as Record<string, unknown>;
+  switch (node.type) {
+    case "videoGen":
+      return pickInlineOrBlobUrl(
+        d.outputVideoDataUrl as string | undefined,
+        d.outputVideoDataUrlBlobId as string | undefined
+      );
+    case "mediaInput": {
+      if (d.mediaType !== "video") return undefined;
+      const fromStored = pickInlineOrBlobUrl(
+        d.videoDataUrl as string | undefined,
+        d.videoDataUrlBlobId as string | undefined
+      );
+      if (fromStored) return fromStored;
+      const prev = d.preview as string | undefined;
+      if (typeof prev === "string" && prev.length > 0) return prev;
+      return undefined;
+    }
+    default:
+      return undefined;
+  }
+}
+
 /**
  * Restore dynamic handle counts from edges (import/export JSON omits `dynamicHandleCounts`).
  */

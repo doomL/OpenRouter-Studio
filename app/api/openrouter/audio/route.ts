@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { modelUsesDedicatedSpeechApi } from "@/lib/openrouter-audio-routing";
 
 const OPENROUTER_AUDIO_URL = "https://openrouter.ai/api/v1/chat/completions";
 
@@ -81,6 +82,108 @@ function shouldRetryAsPcm16(errorText: string): boolean {
   );
 }
 
+function extractUserTextFromMessages(messages: unknown): string {
+  if (!Array.isArray(messages)) return "";
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i];
+    if (!m || typeof m !== "object") continue;
+    if ((m as { role?: string }).role !== "user") continue;
+    const c = (m as { content?: unknown }).content;
+    if (typeof c === "string") return c.trim();
+    if (Array.isArray(c)) {
+      const parts: string[] = [];
+      for (const p of c) {
+        if (p && typeof p === "object" && (p as { type?: string }).type === "text") {
+          const t = (p as { text?: string }).text;
+          if (typeof t === "string") parts.push(t);
+        }
+      }
+      const joined = parts.join("\n").trim();
+      if (joined) return joined;
+    }
+  }
+  return "";
+}
+
+function speechApiFormatAndOut(requested: string): {
+  response_format: string;
+  formatOut: string;
+  hint?: string;
+} {
+  const r = requested.toLowerCase();
+  if (r === "pcm16") return { response_format: "pcm", formatOut: "pcm16" };
+  if (r === "wav") {
+    return {
+      response_format: "mp3",
+      formatOut: "mp3",
+      hint: "OpenRouter /audio/speech returned mp3 instead of wav (endpoint limitation).",
+    };
+  }
+  if (["mp3", "opus", "aac", "flac"].includes(r)) {
+    return { response_format: r, formatOut: r };
+  }
+  if (r === "pcm") return { response_format: "pcm", formatOut: "pcm16" };
+  return { response_format: "mp3", formatOut: "mp3" };
+}
+
+async function handleDedicatedOpenRouterSpeech(
+  body: Record<string, unknown>,
+  apiKey: string,
+  requestedFormat: string
+): Promise<NextResponse> {
+  const model = String(body.model ?? "");
+  const inputText = extractUserTextFromMessages(body.messages);
+  if (!inputText) {
+    return NextResponse.json(
+      {
+        error:
+          "Dedicated TTS (/audio/speech) needs non-empty user message text. Connect a prompt or upstream text.",
+      },
+      { status: 400 }
+    );
+  }
+  const audioCfg = (body.audio as Record<string, unknown> | undefined) ?? {};
+  const voiceRaw = audioCfg.voice;
+  const voice =
+    typeof voiceRaw === "string" && voiceRaw.trim() ? voiceRaw.trim() : "alloy";
+
+  const { response_format, formatOut, hint } = speechApiFormatAndOut(requestedFormat);
+
+  const res = await fetch("https://openrouter.ai/api/v1/audio/speech", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+      "HTTP-Referer": "https://openrouter-studio.local",
+      "X-Title": "OpenRouter Studio",
+    },
+    body: JSON.stringify({ model, input: inputText, voice, response_format }),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    try {
+      const j = JSON.parse(errText) as Record<string, unknown>;
+      return NextResponse.json(j, { status: res.status });
+    } catch {
+      return NextResponse.json({ error: errText }, { status: res.status });
+    }
+  }
+
+  const buf = Buffer.from(await res.arrayBuffer());
+  const ct =
+    res.headers.get("content-type")?.split(";")[0]?.trim() || "audio/mpeg";
+  const audioDataUrl = `data:${ct};base64,${buf.toString("base64")}`;
+
+  return NextResponse.json({
+    audioDataUrl,
+    transcript: "",
+    format: formatOut,
+    requestedFormat,
+    warning: hint,
+  });
+}
+
 export async function POST(req: NextRequest) {
   const apiKey = req.headers.get("x-api-key");
   if (!apiKey) {
@@ -93,6 +196,11 @@ export async function POST(req: NextRequest) {
       typeof body?.audio?.format === "string" && body.audio.format.trim()
         ? body.audio.format.trim().toLowerCase()
         : "wav";
+
+    const modelStr = String(body?.model ?? "");
+    if (modelStr && modelUsesDedicatedSpeechApi(modelStr)) {
+      return handleDedicatedOpenRouterSpeech(body as Record<string, unknown>, apiKey, requestedFormat);
+    }
 
     let requestBody = body as Record<string, unknown>;
     let effectiveFormat = requestedFormat;

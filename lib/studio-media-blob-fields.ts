@@ -12,6 +12,12 @@ export const STUDIO_BLOB_MEDIA_FIELDS: StudioBlobMediaFieldSpec[] = [
   { dataKey: "generatedAudio", blobIdKey: "generatedAudioBlobId", kind: "generatedAudio" },
   { dataKey: "preview", blobIdKey: "previewBlobId", kind: "preview" },
   { dataKey: "videoDataUrl", blobIdKey: "videoDataUrlBlobId", kind: "videoDataUrl" },
+  { dataKey: "audioDataUrl", blobIdKey: "audioDataUrlBlobId", kind: "audioDataUrl" },
+  {
+    dataKey: "outputVideoDataUrl",
+    blobIdKey: "outputVideoDataUrlBlobId",
+    kind: "outputVideoDataUrl",
+  },
   { dataKey: "preKeyImage", blobIdKey: "preKeyImageBlobId", kind: "preKeyImage" },
   { dataKey: "outputImage", blobIdKey: "outputImageBlobId", kind: "outputImage" },
   {

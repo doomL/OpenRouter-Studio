@@ -14,7 +14,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useStudioStore } from "@/lib/store";
-import { getNodeInputs, getImageRefInputs } from "@/lib/execution";
+import {
+  getNodeInputs,
+  getImageRefInputs,
+  imageRefSourcesSignature,
+} from "@/lib/execution";
 import { resolveVideoFrameRefsFromEdges } from "@/lib/video-frame";
 import { readJsonResponse } from "@/lib/read-json-response";
 import { fetchWithRetry, STUDIO_FETCH_MAX_ATTEMPTS } from "@/lib/fetch-with-retry";
@@ -23,45 +27,39 @@ import { AlertTriangleIcon, ClockIcon, Volume2Icon, VolumeXIcon } from "lucide-r
 import { HandleLabel } from "@/components/canvas/HandleLabel";
 import { getCanvasSelectContentProps } from "@/lib/canvas-floating-props";
 import { StudioMultiImageRefHint } from "@/lib/studio-multi-image-ref-hint";
+import {
+  pickInlineOrBlobUrl,
+  studioBlobFetchUrl,
+} from "@/lib/studio-node-media-url";
+import { NodeMediaHistoryButton } from "@/components/studio/NodeMediaHistoryButton";
+import {
+  deriveVideoUiParams,
+  normalizeVideoModelId,
+} from "@/lib/openrouter-video-models";
 
-/** Per-model supported parameters from the docs */
-const MODEL_PARAMS: Record<string, {
-  durations: number[];
-  resolutions: string[];
-  aspectRatios: string[];
-  maxRefs: number;
-  audio: boolean;
-}> = {
-  "google/veo-3.1": {
-    durations: [4, 6, 8],
-    resolutions: ["720p", "1080p", "4K"],
-    aspectRatios: ["16:9", "9:16"],
-    maxRefs: 3,
-    audio: true,
-  },
-  "openai/sora-2-pro": {
-    durations: [4, 8, 12, 16, 20],
-    resolutions: ["720p", "1080p"],
-    aspectRatios: ["16:9", "9:16"],
-    maxRefs: 1,
-    audio: true,
-  },
-  "bytedance/seedance-1-5-pro": {
-    durations: [4, 5, 6, 7, 8, 9, 10, 11, 12],
-    resolutions: ["480p", "720p", "1080p"],
-    aspectRatios: ["16:9", "9:16", "4:3", "3:4", "1:1", "21:9"],
-    maxRefs: 2,
-    audio: true,
-  },
-};
+function videoRefPreviewOrder(handle: string): number {
+  if (handle === "first_frame") return 0;
+  if (handle === "last_frame") return 1;
+  if (handle === "style_ref") return 2;
+  if (handle === "image_url") return 3;
+  const ch = /^character_ref_(\d+)$/.exec(handle);
+  if (ch) return 100 + parseInt(ch[1]!, 10);
+  const ir = /^image_ref_(\d+)$/.exec(handle);
+  if (ir) return 200 + parseInt(ir[1]!, 10);
+  return 500;
+}
 
-const DEFAULT_PARAMS = {
-  durations: [4, 6, 8, 12, 16, 20],
-  resolutions: ["720p", "1080p"],
-  aspectRatios: ["16:9", "9:16", "1:1"],
-  maxRefs: 2,
-  audio: true,
-};
+function labelForVideoRefPreview(handle: string): string {
+  if (handle === "first_frame") return "First";
+  if (handle === "last_frame") return "Last";
+  if (handle === "style_ref") return "Style";
+  if (handle === "image_url") return "Image";
+  const ch = /^character_ref_(\d+)$/.exec(handle);
+  if (ch) return `Char ${ch[1]}`;
+  const ir = /^image_ref_(\d+)$/.exec(handle);
+  if (ir) return `Ref ${ir[1]}`;
+  return handle;
+}
 
 function VideoNodeComponent({ id, data }: NodeProps) {
   const updateNodeData = useStudioStore((s) => s.updateNodeData);
@@ -71,6 +69,10 @@ function VideoNodeComponent({ id, data }: NodeProps) {
   const nodes = useStudioStore((s) => s.nodes);
   const nodeOutputs = useStudioStore((s) => s.nodeOutputs);
   const apiKey = useStudioStore((s) => s.apiKey);
+  const videoModels = useStudioStore((s) => s.models?.video);
+  const upstreamVisualSig = useStudioStore((s) =>
+    imageRefSourcesSignature(id, s.edges, s.nodeOutputs, s.nodes)
+  );
   const videoJob = useStudioStore((s) => s.videoJobs[id]);
   const setVideoJob = useStudioStore((s) => s.setVideoJob);
   const addCost = useStudioStore((s) => s.addCost);
@@ -86,8 +88,62 @@ function VideoNodeComponent({ id, data }: NodeProps) {
   const generateAudio = (data.generateAudio as boolean) ?? true;
   const seed = (data.seed as string) || "";
 
-  // Get model-specific params
-  const params = MODEL_PARAMS[model] || DEFAULT_PARAMS;
+  const persistedVideoUrl = pickInlineOrBlobUrl(
+    data.outputVideoDataUrl as string | undefined,
+    data.outputVideoDataUrlBlobId as string | undefined
+  );
+  const outputVideoBlobId = data.outputVideoDataUrlBlobId as string | undefined;
+  const hasPendingInlineOutput =
+    typeof data.outputVideoDataUrl === "string" &&
+    data.outputVideoDataUrl.startsWith("data:");
+
+  const modelMeta = useMemo(() => {
+    if (!model || !videoModels?.length) return undefined;
+    const t = normalizeVideoModelId(model);
+    return videoModels.find(
+      (m) => m.id === model || normalizeVideoModelId(m.id) === t
+    );
+  }, [videoModels, model]);
+
+  const params = useMemo(
+    () => deriveVideoUiParams(modelMeta?.video_generation),
+    [modelMeta?.video_generation]
+  );
+
+  useEffect(() => {
+    if (!model) return;
+    const patch: Record<string, unknown> = {};
+    if (!params.aspectRatios.includes(aspectRatio)) {
+      patch.aspectRatio = params.aspectRatios[0];
+    }
+    if (!params.durations.includes(duration)) {
+      patch.duration = params.durations[0];
+    }
+    if (resolution && params.resolutions.length > 0 && !params.resolutions.includes(resolution)) {
+      patch.resolution = "";
+    }
+    if (size && params.sizes.length > 0 && !params.sizes.includes(size)) {
+      patch.size = "";
+    }
+    if (!params.audioCapability && generateAudio) {
+      patch.generateAudio = false;
+    }
+    if (Object.keys(patch).length > 0) updateNodeData(id, patch);
+  }, [
+    model,
+    aspectRatio,
+    duration,
+    resolution,
+    size,
+    generateAudio,
+    params.aspectRatios,
+    params.durations,
+    params.resolutions,
+    params.sizes,
+    params.audioCapability,
+    id,
+    updateNodeData,
+  ]);
 
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [elapsed, setElapsed] = useState(0);
@@ -108,6 +164,60 @@ function VideoNodeComponent({ id, data }: NodeProps) {
     }
   }, [apiKey, id, nodeOutput?.video_url, nodeOutput?.status, setNodeOutput, setVideoJob, videoJob]);
 
+  useEffect(() => {
+    if (!persistedVideoUrl || nodeOutput?.video_url) return;
+    setNodeOutput(id, {
+      ...useStudioStore.getState().nodeOutputs[id],
+      video_url: persistedVideoUrl,
+      status: "done",
+    });
+  }, [id, nodeOutput?.video_url, persistedVideoUrl, setNodeOutput]);
+
+  /** After a job completes, fetch the MP4 once and stash a data URL on the node so cloud sync can upload it to object storage (MinIO/S3). */
+  useEffect(() => {
+    if (videoJob?.status !== "completed" || !videoJob.jobId) return;
+    if (outputVideoBlobId || hasPendingInlineOutput) return;
+    const proxyUrl = `/api/openrouter/video/download?jobId=${videoJob.jobId}&index=0&key=${encodeURIComponent(apiKey)}`;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch(proxyUrl);
+        if (cancelled || !res.ok) return;
+        const fresh = useStudioStore.getState().nodes.find((n) => n.id === id)?.data as
+          | Record<string, unknown>
+          | undefined;
+        if (fresh?.outputVideoDataUrlBlobId) return;
+        if (
+          typeof fresh?.outputVideoDataUrl === "string" &&
+          fresh.outputVideoDataUrl.startsWith("data:")
+        )
+          return;
+        const blob = await res.blob();
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+          const r = new FileReader();
+          r.onload = () => resolve(r.result as string);
+          r.onerror = () => reject(new Error("read"));
+          r.readAsDataURL(blob);
+        });
+        if (cancelled) return;
+        updateNodeData(id, { outputVideoDataUrl: dataUrl });
+      } catch {
+        // Non-fatal; user can still use the time-limited proxy URL.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    apiKey,
+    hasPendingInlineOutput,
+    id,
+    outputVideoBlobId,
+    updateNodeData,
+    videoJob?.jobId,
+    videoJob?.status,
+  ]);
+
   const jobStatus = videoJob?.status || "idle";
   const isPolling = jobStatus === "pending" || jobStatus === "in_progress";
   const showGenerating = isPolling || nodeOutput?.status === "loading";
@@ -126,9 +236,16 @@ function VideoNodeComponent({ id, data }: NodeProps) {
     );
   }, [id, edges, nodeOutputs, nodes]);
 
-  const charHandleCount = Math.max(
-    dynamicCount,
-    connectedCharRefs.length + 1
+  const connectedVisualRefs = useMemo(() => {
+    const { edges, nodes, nodeOutputs } = useStudioStore.getState();
+    return getImageRefInputs(id, edges, nodeOutputs, nodes)
+      .filter((r) => Boolean(r.url))
+      .sort((a, b) => videoRefPreviewOrder(a.handle) - videoRefPreviewOrder(b.handle));
+  }, [id, upstreamVisualSig]);
+
+  const charHandleCount = Math.min(
+    Math.max(dynamicCount, connectedCharRefs.length + 1, 1),
+    params.maxRefs
   );
 
   useEffect(() => {
@@ -188,6 +305,11 @@ function VideoNodeComponent({ id, data }: NodeProps) {
 
   const generate = useCallback(async () => {
     if (!model || !apiKey) return;
+    // Drop stale persisted bytes so a new run cannot be shadowed by an old data: / blob ref in `data`.
+    updateNodeData(id, {
+      outputVideoDataUrl: undefined,
+      outputVideoDataUrlBlobId: undefined,
+    });
     setNodeOutput(id, {
       ...nodeOutputs[id],
       status: "loading",
@@ -199,7 +321,7 @@ function VideoNodeComponent({ id, data }: NodeProps) {
       const imageRefs = getImageRefInputs(id, edges, nodeOutputs, nodes);
       let videoFrameRefs: Array<{ handle: string; url: string }> = [];
       try {
-        videoFrameRefs = await resolveVideoFrameRefsFromEdges(id, edges, nodeOutputs);
+        videoFrameRefs = await resolveVideoFrameRefsFromEdges(id, edges, nodeOutputs, nodes);
       } catch (e) {
         const msg =
           e instanceof Error ? e.message : "Could not extract video frame";
@@ -229,14 +351,14 @@ function VideoNodeComponent({ id, data }: NodeProps) {
         }
       }
 
-      // Audio generation
-      if (params.audio) {
+      // Audio generation (only if the provider supports it)
+      if (params.audioCapability) {
         body.generate_audio = generateAudio;
       }
 
       // Seed for reproducibility
-      if (seed) {
-        const seedNum = parseInt(seed);
+      if (params.seedSupported && seed) {
+        const seedNum = parseInt(seed, 10);
         if (!isNaN(seedNum)) body.seed = seedNum;
       }
 
@@ -245,14 +367,33 @@ function VideoNodeComponent({ id, data }: NodeProps) {
         image_url: { url: string };
       }> = [];
 
+      /** First/last frame must use `frame_images` + `frame_type` (OpenRouter); `input_references` is for style/refs only. */
+      const frameImages: Array<{
+        type: string;
+        image_url: { url: string };
+        frame_type: string;
+      }> = [];
+
       const firstFrame = imageRefsMerged.find((r) => r.handle === "first_frame");
       if (firstFrame) {
-        inputRefs.push({ type: "image_url", image_url: { url: firstFrame.url } });
+        frameImages.push({
+          type: "image_url",
+          image_url: { url: firstFrame.url },
+          frame_type: "first_frame",
+        });
       }
 
       const lastFrame = imageRefsMerged.find((r) => r.handle === "last_frame");
       if (lastFrame) {
-        inputRefs.push({ type: "image_url", image_url: { url: lastFrame.url } });
+        frameImages.push({
+          type: "image_url",
+          image_url: { url: lastFrame.url },
+          frame_type: "last_frame",
+        });
+      }
+
+      if (frameImages.length > 0) {
+        body.frame_images = frameImages;
       }
 
       const charRefs = imageRefsMerged.filter((r) =>
@@ -330,29 +471,71 @@ function VideoNodeComponent({ id, data }: NodeProps) {
     size,
     generateAudio,
     seed,
-    params.audio,
+    params,
     setNodeOutput,
     setVideoJob,
+    updateNodeData,
   ]);
 
   const formatTime = (s: number) =>
     `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, "0")}`;
 
+  /** Prefer live output URL (newest generation); fall back like image node — avoids stale persisted data: URLs shadowing a fresh job. */
+  const previewVideoUrl =
+    nodeOutput?.video_url ||
+    persistedVideoUrl ||
+    (videoJob?.status === "completed" ? videoJob.videoUrl : undefined);
+
   const handleDownload = useCallback(() => {
-    if (!videoJob?.videoUrl) return;
-    const url = `/api/openrouter/video/download?jobId=${videoJob.jobId}&index=0&key=${encodeURIComponent(apiKey)}`;
+    const src =
+      nodeOutput?.video_url ||
+      persistedVideoUrl ||
+      (videoJob?.status === "completed" ? videoJob.videoUrl : undefined);
+    if (!src) return;
+    let url = src;
+    if (
+      videoJob?.jobId &&
+      !persistedVideoUrl &&
+      !nodeOutput?.video_url &&
+      videoJob?.status === "completed"
+    ) {
+      url = `/api/openrouter/video/download?jobId=${videoJob.jobId}&index=0&key=${encodeURIComponent(apiKey)}`;
+    }
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${videoJob.jobId}.mp4`;
+    a.download = `${videoJob?.jobId ?? "video"}.mp4`;
     a.click();
-  }, [videoJob, apiKey]);
+  }, [
+    apiKey,
+    persistedVideoUrl,
+    videoJob?.jobId,
+    videoJob?.status,
+    videoJob?.videoUrl,
+    nodeOutput?.video_url,
+  ]);
 
   return (
     <div
       className={`min-w-[280px] rounded-lg border-2 ${borderColor} bg-studio-node shadow-lg relative`}
     >
       <div className="rounded-t-lg bg-blue-700 px-3 py-1.5 text-xs font-semibold text-white flex items-center justify-between gap-2">
-        <span>{nodeLabel}</span>
+        <span className="flex items-center gap-1 min-w-0">
+          {nodeLabel}
+          <NodeMediaHistoryButton
+            nodeId={id}
+            kindFilter="outputVideoDataUrl"
+            onRestore={(blobId) => {
+              updateNodeData(id, {
+                outputVideoDataUrl: undefined,
+                outputVideoDataUrlBlobId: blobId,
+              });
+              setNodeOutput(id, {
+                video_url: studioBlobFetchUrl(blobId),
+                status: "done",
+              });
+            }}
+          />
+        </span>
         <Input
           value={nodeLabel === "Video Generation" ? "" : nodeLabel}
           onChange={(e) =>
@@ -368,6 +551,12 @@ function VideoNodeComponent({ id, data }: NodeProps) {
           value={model}
           onChange={(v) => updateNodeData(id, { model: v })}
         />
+        {model && !params.fromApi ? (
+          <p className="text-[9px] text-muted-foreground leading-snug">
+            Model not in the video catalog yet — using generic controls. For a custom model id, match
+            OpenRouter docs or pick from the list after models refresh.
+          </p>
+        ) : null}
 
         {/* Duration — model-specific options */}
         <div>
@@ -442,15 +631,21 @@ function VideoNodeComponent({ id, data }: NodeProps) {
             placeholder="Auto (use resolution + ratio)"
             className="h-7 text-xs bg-studio-node-input border-studio-node-border"
           />
-          {size && (
+          {params.sizes.length > 0 ? (
+            <p className="text-[9px] text-muted-foreground mt-0.5">
+              Allowed: {params.sizes.slice(0, 6).join(", ")}
+              {params.sizes.length > 6 ? "…" : ""}
+            </p>
+          ) : null}
+          {size ? (
             <p className="text-[9px] text-muted-foreground mt-0.5">
               Overrides resolution &amp; aspect ratio
             </p>
-          )}
+          ) : null}
         </div>
 
         {/* Audio toggle */}
-        {params.audio && (
+        {params.audioCapability ? (
           <button
             type="button"
             className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
@@ -463,32 +658,42 @@ function VideoNodeComponent({ id, data }: NodeProps) {
             )}
             Audio: {generateAudio ? "On" : "Off"}
           </button>
-        )}
+        ) : null}
 
         {/* Seed */}
-        <div>
-          <Label className="text-xs text-muted-foreground">Seed (optional)</Label>
-          <Input
-            type="number"
-            value={seed}
-            onChange={(e) => updateNodeData(id, { seed: e.target.value })}
-            placeholder="Random"
-            className="h-7 text-xs bg-studio-node-input border-studio-node-border"
-          />
-        </div>
-
-        {connectedCharRefs.length > 0 && (
-          <div className="flex gap-1 flex-wrap">
-            {connectedCharRefs.map((ref) => (
-              <img
-                key={ref.handle}
-                src={ref.url}
-                alt={ref.handle}
-                className="h-10 w-10 rounded object-cover border border-studio-node-border"
-              />
-            ))}
+        {params.seedSupported ? (
+          <div>
+            <Label className="text-xs text-muted-foreground">Seed (optional)</Label>
+            <Input
+              type="number"
+              value={seed}
+              onChange={(e) => updateNodeData(id, { seed: e.target.value })}
+              placeholder="Random"
+              className="h-7 text-xs bg-studio-node-input border-studio-node-border"
+            />
           </div>
-        )}
+        ) : null}
+
+        {connectedVisualRefs.length > 0 ? (
+          <div className="space-y-1">
+            <Label className="text-[10px] text-muted-foreground">Reference previews</Label>
+            <div className="flex gap-1.5 flex-wrap">
+              {connectedVisualRefs.map((ref) => (
+                <div key={ref.handle} className="flex flex-col items-center gap-0.5 max-w-[52px]">
+                  <img
+                    src={ref.url}
+                    alt={ref.handle}
+                    title={ref.handle}
+                    className="h-10 w-10 rounded object-cover border border-studio-node-border bg-muted/40"
+                  />
+                  <span className="text-[8px] text-muted-foreground text-center leading-tight truncate w-full">
+                    {labelForVideoRefPreview(ref.handle)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
 
         <div className="space-y-1.5 border-t border-studio-node-border pt-2">
           <StudioMultiImageRefHint className="text-[9px] text-muted-foreground leading-snug" />
@@ -518,21 +723,28 @@ function VideoNodeComponent({ id, data }: NodeProps) {
           )}
         </Button>
 
-        {videoJob?.status === "completed" && videoJob.videoUrl && (
+        {previewVideoUrl ? (
           <div className="mt-2 space-y-1">
             <video
+              key={previewVideoUrl}
               controls
-              src={videoJob.videoUrl}
+              src={previewVideoUrl}
               className="w-full max-h-[200px] rounded bg-black"
             />
             <div className="flex items-center justify-between">
-              <Badge
-                variant="outline"
-                className="text-[9px] border-orange-500 text-orange-400 gap-0.5"
-              >
-                <AlertTriangleIcon className="size-2.5" />
-                URL expires ~24h
-              </Badge>
+              {!persistedVideoUrl ? (
+                <Badge
+                  variant="outline"
+                  className="text-[9px] border-orange-500 text-orange-400 gap-0.5"
+                >
+                  <AlertTriangleIcon className="size-2.5" />
+                  URL expires ~24h
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="text-[9px] border-green-600 text-green-400 gap-0.5">
+                  Stored in your library
+                </Badge>
+              )}
               <Button
                 size="sm"
                 variant="ghost"
@@ -543,7 +755,7 @@ function VideoNodeComponent({ id, data }: NodeProps) {
               </Button>
             </div>
           </div>
-        )}
+        ) : null}
 
         {(videoJob?.status === "failed" || nodeOutput?.error) && (
           <div className="mt-2 rounded bg-red-900/30 p-2 text-xs text-red-400">

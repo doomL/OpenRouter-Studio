@@ -1,7 +1,8 @@
 "use client";
 
-import type { Edge } from "@xyflow/react";
+import type { Edge, Node } from "@xyflow/react";
 import type { NodeOutput } from "./store";
+import { videoUrlFromPersistedNodeData } from "@/lib/canvas-handles";
 
 /**
  * For each edge from another node's **video out** to this node's `first_frame` or `last_frame`,
@@ -16,15 +17,20 @@ import type { NodeOutput } from "./store";
 export async function resolveVideoFrameRefsFromEdges(
   nodeId: string,
   edges: Edge[],
-  nodeOutputs: Record<string, NodeOutput>
+  nodeOutputs: Record<string, NodeOutput>,
+  nodes?: Node[]
 ): Promise<Array<{ handle: string; url: string }>> {
   const results: Array<{ handle: string; url: string }> = [];
+  const nodeById = nodes ? new Map(nodes.map((n) => [n.id, n])) : null;
   for (const edge of edges.filter((e) => e.target === nodeId)) {
     const th = edge.targetHandle || "";
     if (th !== "first_frame" && th !== "last_frame") continue;
     if (edge.sourceHandle !== "video_url") continue;
     const out = nodeOutputs[edge.source];
-    const videoUrl = out?.video_url;
+    let videoUrl = out?.video_url;
+    if (!videoUrl && nodeById) {
+      videoUrl = videoUrlFromPersistedNodeData(nodeById.get(edge.source));
+    }
     if (!videoUrl) continue;
     // When continuing a video chain, the first frame of the new clip should be
     // the last frame of the previous clip (and vice-versa for last_frame).

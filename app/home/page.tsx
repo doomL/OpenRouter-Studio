@@ -155,7 +155,7 @@ export default async function StudioHomePage() {
                     · {w.nodeCount} nodes · {w.edgeCount} edges
                   </div>
                   <Link
-                    href="/studio"
+                    href={`/studio?workflow=${encodeURIComponent(w.id)}`}
                     className={cn(
                       "mt-3 flex w-full items-center justify-center rounded-md",
                       "bg-secondary px-3 py-1.5 text-xs font-medium text-secondary-foreground hover:bg-secondary/80"

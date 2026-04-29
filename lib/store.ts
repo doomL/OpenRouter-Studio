@@ -179,8 +179,20 @@ interface StudioState {
   setApiKey: (key: string) => void;
 
   // Models cache
-  models: { text: Model[]; image: Model[]; video: Model[]; audio: Model[] } | null;
-  setModels: (models: { text: Model[]; image: Model[]; video: Model[]; audio: Model[] }) => void;
+  models: {
+    text: Model[];
+    image: Model[];
+    video: Model[];
+    audio: Model[];
+    transcribe: Model[];
+  } | null;
+  setModels: (models: {
+    text: Model[];
+    image: Model[];
+    video: Model[];
+    audio: Model[];
+    transcribe: Model[];
+  }) => void;
 
   // Canvas
   nodes: Node[];
@@ -270,6 +282,8 @@ export interface StudioServerSnapshot {
   >;
 }
 
+import type { VideoGenerationCapabilities } from "@/lib/openrouter-video-models";
+
 export interface Model {
   id: string;
   name: string;
@@ -279,6 +293,10 @@ export interface Model {
   context_length?: number;
   architecture?: { modality: string };
   output_modalities?: string[];
+  /** TTS-only models: voice ids from OpenRouter frontend API */
+  supported_tts_voices?: string[];
+  /** From OpenRouter video models catalog */
+  video_generation?: VideoGenerationCapabilities;
 }
 
 export const useStudioStore = create<StudioState>()(

@@ -7,6 +7,7 @@ import { ImageNode } from "./ImageNode";
 import { BackgroundRemovalNode } from "./BackgroundRemovalNode";
 import { VideoNode } from "./VideoNode";
 import { AudioNode } from "./AudioNode";
+import { TranscribeNode } from "./TranscribeNode";
 import { OutputNode } from "./OutputNode";
 import { NoteNode } from "./NoteNode";
 import { FreeTextNode } from "./FreeTextNode";
@@ -20,6 +21,7 @@ export const nodeTypes: NodeTypes = {
   bgRemove: BackgroundRemovalNode,
   videoGen: VideoNode,
   audioGen: AudioNode,
+  transcribe: TranscribeNode,
   output: OutputNode,
   note: NoteNode,
   freeText: FreeTextNode,
@@ -43,7 +45,7 @@ export const nodeDefinitions = [
   {
     type: "mediaInput",
     label: "Media Input",
-    description: "Upload image or video",
+    description: "Upload image, video, or audio",
     color: "bg-teal-700",
     icon: "upload",
   },
@@ -81,6 +83,13 @@ export const nodeDefinitions = [
     description: "Generate speech or songs",
     color: "bg-pink-700",
     icon: "audio",
+  },
+  {
+    type: "transcribe",
+    label: "Transcribe",
+    description: "Turn audio into text (speech-to-text)",
+    color: "bg-cyan-800",
+    icon: "mic",
   },
   {
     type: "output",

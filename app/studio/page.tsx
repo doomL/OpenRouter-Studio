@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ReactFlowProvider } from "@xyflow/react";
 import { StudioCanvas } from "@/components/canvas/StudioCanvas";
 import { NodePanel } from "@/components/canvas/NodePanel";
@@ -50,8 +51,10 @@ import { ThemedLogo } from "@/components/theme/ThemedLogo";
 import { toast } from "@/lib/toast";
 import { buildStudioMediaZip, type StudioMediaZipOptions } from "@/lib/studio-media-zip";
 
-export default function StudioPage() {
+function StudioPageContent() {
   const cloudSyncReady = useStudioCloudSync();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const { data: session, status: sessionStatus } = useSession();
   const apiKey = useStudioStore((s) => s.apiKey);
   const theme = useStudioStore((s) => s.theme);
@@ -101,6 +104,23 @@ export default function StudioPage() {
       setShowApiKey(true);
     }
   }, [mounted, cloudSyncReady, apiKey, sessionStatus]);
+
+  const workflowIdFromUrl = searchParams.get("workflow");
+
+  useEffect(() => {
+    if (!cloudSyncReady || !workflowIdFromUrl?.trim()) return;
+
+    const { workflows: list } = useStudioStore.getState();
+    const wf = list.find((w) => w.id === workflowIdFromUrl);
+    if (wf) {
+      loadWorkflow(workflowIdFromUrl);
+      toast.success(`Loaded “${wf.name}”`);
+    } else {
+      toast.error("Saved workflow not found. It may have been deleted.");
+    }
+
+    router.replace("/studio", { scroll: false });
+  }, [cloudSyncReady, workflowIdFromUrl, loadWorkflow, router]);
 
   const handleSave = useCallback(() => {
     setSaveDialogOpen(true);
@@ -548,6 +568,20 @@ export default function StudioPage() {
         />
       </div>
     </ReactFlowProvider>
+  );
+}
+
+export default function StudioPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-background text-muted-foreground text-sm">
+          Loading studio…
+        </div>
+      }
+    >
+      <StudioPageContent />
+    </Suspense>
   );
 }
 

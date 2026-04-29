@@ -1,6 +1,7 @@
 import type { Edge, Node } from "@xyflow/react";
 import JSZip from "jszip";
 import type { NodeOutput, VideoJob } from "@/lib/store";
+import { pickInlineOrBlobUrl } from "@/lib/studio-node-media-url";
 
 function safeSegment(id: string): string {
   return id.replace(/[^a-zA-Z0-9_-]+/g, "_").slice(0, 80);
@@ -225,10 +226,18 @@ export async function buildStudioMediaZip(
           await addUrl(d.preview as string | undefined, `${sid}-preview`);
           await addUrl(d.videoDataUrl as string | undefined, `${sid}-videodata`);
         }
+        if (mediaType === "audio") {
+          const u = pickInlineOrBlobUrl(
+            d.audioDataUrl as string | undefined,
+            d.audioDataUrlBlobId as string | undefined
+          );
+          if (u) await addUrl(u, `${sid}-media-audio`);
+        }
         if (out?.image_url) await addUrl(out.image_url, `${sid}-img-out`);
         else if (mediaType === "image")
           addRawBase64IfNeeded(out?.image_base64, node.id, "b64");
         if (out?.video_url) await addUrl(out.video_url, `${sid}-vid-out`);
+        if (out?.audio_url) await addUrl(out.audio_url, `${sid}-audio-out`);
         break;
       }
       case "imageGen": {
@@ -239,6 +248,11 @@ export async function buildStudioMediaZip(
       }
       case "videoGen": {
         if (!resolvedOptions.includeVideoGenNodes) break;
+        const persisted = pickInlineOrBlobUrl(
+          d.outputVideoDataUrl as string | undefined,
+          d.outputVideoDataUrlBlobId as string | undefined
+        );
+        if (persisted) await addUrl(persisted, `${sid}-video-persisted`);
         if (out?.video_url) await addUrl(out.video_url, `${sid}-video`);
         const job = videoJobs[node.id];
         await addUrl(job?.videoUrl, `${sid}-job-url`);
@@ -262,6 +276,7 @@ export async function buildStudioMediaZip(
       default: {
         if (out?.image_url) await addUrl(out.image_url, `${sid}-img`);
         if (out?.video_url) await addUrl(out.video_url, `${sid}-vid`);
+        if (out?.audio_url) await addUrl(out.audio_url, `${sid}-audio`);
         if (!out?.image_url)
           addRawBase64IfNeeded(out?.image_base64, node.id, "b64");
       }

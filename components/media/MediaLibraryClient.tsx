@@ -63,6 +63,7 @@ export function MediaLibraryClient() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<StudioMediaItemDto | null>(null);
+  const [detailWorkflowId, setDetailWorkflowId] = useState<string | null>(null);
 
   useEffect(() => {
     const t = setTimeout(() => setQ(qInput.trim()), 350);
@@ -109,6 +110,22 @@ export function MediaLibraryClient() {
     void load();
   }, [load]);
 
+  useEffect(() => {
+    if (!selected) {
+      setDetailWorkflowId(null);
+      return;
+    }
+    if (selected.workflows.length > 0) {
+      setDetailWorkflowId(selected.workflows[0].id);
+    } else {
+      setDetailWorkflowId(null);
+    }
+  }, [selected]);
+
+  const studioOpenHref =
+    detailWorkflowId != null
+      ? `/studio?workflow=${encodeURIComponent(detailWorkflowId)}`
+      : "/studio";
   const downloadHref = selected
     ? `/api/studio/blobs/${encodeURIComponent(selected.id)}?download=1`
     : "#";
@@ -403,9 +420,32 @@ export function MediaLibraryClient() {
               </div>
             )}
             <DialogFooter className="!border-0 !bg-transparent !p-0 !-mx-0 !-mb-0">
-              <div className="flex w-full flex-row flex-wrap items-center justify-between gap-2 pt-2">
+              <div className="flex w-full flex-col gap-2 pt-2">
+                {selected && selected.workflows.length > 1 ? (
+                  <div className="space-y-1">
+                    <Label htmlFor="media-open-workflow" className="text-xs text-muted-foreground">
+                      Open in saved workflow
+                    </Label>
+                    <select
+                      id="media-open-workflow"
+                      value={detailWorkflowId ?? ""}
+                      onChange={(e) => setDetailWorkflowId(e.target.value || null)}
+                      className={cn(
+                        "h-9 w-full rounded-md border border-border bg-background px-2 text-sm",
+                        "outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      )}
+                    >
+                      {selected.workflows.map((w) => (
+                        <option key={w.id} value={w.id}>
+                          {w.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : null}
+                <div className="flex w-full flex-row flex-wrap items-center justify-between gap-2">
                 <Link
-                  href="/studio"
+                  href={studioOpenHref}
                   className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
                 >
                   Open Studio
@@ -417,6 +457,7 @@ export function MediaLibraryClient() {
                   <DownloadIcon className="size-3.5" />
                   Download
                 </a>
+              </div>
               </div>
             </DialogFooter>
           </DialogContent>

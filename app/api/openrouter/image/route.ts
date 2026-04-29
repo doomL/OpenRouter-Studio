@@ -43,10 +43,35 @@ export async function POST(req: NextRequest) {
       refUrls.push(image);
     }
 
+    const fontPairsRaw = Array.isArray(font_inputs)
+      ? font_inputs
+          .filter((x): x is Record<string, unknown> => !!x && typeof x === "object")
+          .map((x) => ({
+            font_url: typeof x.font_url === "string" ? x.font_url.trim() : "",
+            text: typeof x.text === "string" ? x.text.trim() : "",
+          }))
+          .filter((x) => x.font_url.length > 0 && x.text.length > 0)
+          .slice(0, 2)
+      : [];
+
+    const superResUrlsRaw = Array.isArray(super_resolution_references)
+      ? super_resolution_references
+          .filter((x): x is string => typeof x === "string")
+          .map((x) => x.trim())
+          .filter((x) => x.length > 0)
+          .slice(0, 4)
+      : [];
+
+    const allUrlsForBlobAuth = [
+      ...refUrls,
+      ...fontPairsRaw.map((f) => f.font_url),
+      ...superResUrlsRaw,
+    ];
+
     const session = await auth();
     const userId = session?.user?.id;
 
-    if (refUrlsNeedStudioAuth(refUrls) && !userId) {
+    if (refUrlsNeedStudioAuth(allUrlsForBlobAuth) && !userId) {
       return NextResponse.json(
         {
           error:
@@ -57,10 +82,24 @@ export async function POST(req: NextRequest) {
     }
 
     let resolvedRefUrls: string[];
+    let resolvedFontInputs: Array<{ font_url: string; text: string }>;
+    let resolvedSuperResRefs: string[];
     try {
       resolvedRefUrls = await Promise.all(
         refUrls.map((u) => resolveImageUrlForOpenRouter(u, userId))
       );
+      resolvedFontInputs = await Promise.all(
+        fontPairsRaw.map(async (f) => ({
+          font_url: await resolveImageUrlForOpenRouter(f.font_url, userId),
+          text: f.text,
+        }))
+      );
+      resolvedSuperResRefs =
+        superResUrlsRaw.length > 0
+          ? await Promise.all(
+              superResUrlsRaw.map((u) => resolveImageUrlForOpenRouter(u, userId))
+            )
+          : [];
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Failed to resolve reference images";
       return NextResponse.json({ error: { message: msg } }, { status: 400 });
@@ -105,27 +144,12 @@ export async function POST(req: NextRequest) {
     if (aspect_ratio) imageConfig.aspect_ratio = aspect_ratio;
     if (image_size) imageConfig.image_size = image_size;
 
-    if (Array.isArray(font_inputs)) {
-      const normalizedFonts = font_inputs
-        .filter((x): x is Record<string, unknown> => !!x && typeof x === "object")
-        .map((x) => ({
-          font_url: typeof x.font_url === "string" ? x.font_url.trim() : "",
-          text: typeof x.text === "string" ? x.text.trim() : "",
-        }))
-        .filter((x) => x.font_url.length > 0 && x.text.length > 0)
-        .slice(0, 2);
-      if (normalizedFonts.length > 0) imageConfig.font_inputs = normalizedFonts;
+    if (resolvedFontInputs.length > 0) {
+      imageConfig.font_inputs = resolvedFontInputs;
     }
 
-    if (Array.isArray(super_resolution_references)) {
-      const normalizedRefs = super_resolution_references
-        .filter((x): x is string => typeof x === "string")
-        .map((x) => x.trim())
-        .filter((x) => x.length > 0)
-        .slice(0, 4);
-      if (normalizedRefs.length > 0) {
-        imageConfig.super_resolution_references = normalizedRefs;
-      }
+    if (resolvedSuperResRefs.length > 0) {
+      imageConfig.super_resolution_references = resolvedSuperResRefs;
     }
 
     if (Object.keys(imageConfig).length > 0) {

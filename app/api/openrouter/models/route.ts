@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { categorizeModels, type OpenRouterModel } from "@/lib/models";
 import { fetchWithRetry, STUDIO_FETCH_MAX_ATTEMPTS } from "@/lib/fetch-with-retry";
+import {
+  enrichVideoModelsWithCapabilities,
+  parseVideosModelsApiResponse,
+  type VideoGenerationCapabilities,
+} from "@/lib/openrouter-video-models";
 
 const COMMON_HEADERS = {
   "HTTP-Referer": "https://openrouter-studio.local",
@@ -14,9 +19,9 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    // Fetch text/image models from the frontend API and
-    // video models from the dedicated v1 endpoint in parallel
-    const [frontendRes, videoRes] = await Promise.all([
+    // Fetch text/image models from the frontend API, video ids from v1, and
+    // authoritative per-model constraints from the video models catalog (aspect ratios, durations, etc.).
+    const [frontendRes, videoRes, videosMetaRes] = await Promise.all([
       fetchWithRetry(
         "https://openrouter.ai/api/frontend/models",
         {
@@ -37,6 +42,9 @@ export async function GET(req: NextRequest) {
         },
         { maxAttempts: STUDIO_FETCH_MAX_ATTEMPTS }
       ).catch(() => null), // Non-critical — fall back to frontend models if this fails
+      fetchWithRetry("https://openrouter.ai/api/v1/videos/models", {
+        headers: { ...COMMON_HEADERS },
+      }).catch(() => null),
     ]);
 
     if (!frontendRes.ok) {
@@ -47,6 +55,18 @@ export async function GET(req: NextRequest) {
     const json = await frontendRes.json();
     const models = json.data || json;
     const categorized = categorizeModels(Array.isArray(models) ? models : []);
+
+    let videoCapsById = new Map<string, VideoGenerationCapabilities>();
+    if (videosMetaRes?.ok) {
+      try {
+        const vmJson = await videosMetaRes.json();
+        videoCapsById = parseVideosModelsApiResponse(vmJson);
+      } catch {
+        /* ignore */
+      }
+    }
+
+    categorized.video = enrichVideoModelsWithCapabilities(categorized.video, videoCapsById);
 
     // Merge video models from the v1 endpoint (official source)
     if (videoRes?.ok) {
@@ -70,7 +90,9 @@ export async function GET(req: NextRequest) {
               context_length: (raw.context_length as number) || 0,
               output_modalities: ["video"],
             };
-            categorized.video.push(model);
+            categorized.video.push(
+              enrichVideoModelsWithCapabilities([model], videoCapsById)[0]
+            );
           }
         }
       } catch {
