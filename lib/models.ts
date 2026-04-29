@@ -108,6 +108,10 @@ export function categorizeModels(models: Record<string, unknown>[]) {
 
     // Extract pricing from endpoint
     const endpoint = raw.endpoint as Record<string, unknown> | undefined;
+    // OpenRouter chat/API expects `model_variant_slug` (e.g. vendor/model:free), not the
+    // top-level `slug` alone — free tiers 404 without the :free suffix.
+    const id =
+      (endpoint?.model_variant_slug as string | undefined)?.trim() || slug;
     const epPricing = endpoint?.pricing as Record<string, string> | undefined;
     const pricingJson = endpoint?.pricing_json as Record<string, unknown> | undefined;
 
@@ -121,7 +125,7 @@ export function categorizeModels(models: Record<string, unknown>[]) {
     const priceLabel = extractGenPrice(pricingJson);
 
     const model: OpenRouterModel = {
-      id: slug,
+      id,
       name,
       description: (raw.description as string) || undefined,
       pricing,
@@ -134,19 +138,19 @@ export function categorizeModels(models: Record<string, unknown>[]) {
       text.push(model);
     }
 
-    if (outputMods.includes("image") && !seenImage.has(slug)) {
+    if (outputMods.includes("image") && !seenImage.has(id)) {
       image.push(model);
-      seenImage.add(slug);
+      seenImage.add(id);
     }
 
-    if (outputMods.includes("video") && !seenVideo.has(slug)) {
+    if (outputMods.includes("video") && !seenVideo.has(id)) {
       video.push(model);
-      seenVideo.add(slug);
+      seenVideo.add(id);
     }
 
-    if (outputMods.includes("audio") && !seenAudio.has(slug)) {
+    if (outputMods.includes("audio") && !seenAudio.has(id)) {
       audio.push(model);
-      seenAudio.add(slug);
+      seenAudio.add(id);
     }
   }
 
