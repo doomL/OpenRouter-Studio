@@ -12,8 +12,8 @@ services:
       - minio-data:/data
     # Expose only on loopback so S3/Console are not reachable from other machines.
     ports:
-      - "127.0.0.1:${MINIO_PORT:-9000}:9000"
-      - "127.0.0.1:${MINIO_CONSOLE_PORT:-9001}:9001"
+      - "127.0.0.1:${MINIO_PORT:-19200}:9000"
+      - "127.0.0.1:${MINIO_CONSOLE_PORT:-19201}:9001"
 
   # Creates the bucket once MinIO accepts connections (required before uploads work).
   minio-init:
