@@ -210,21 +210,30 @@ export async function buildStudioMediaZip(
     switch (type) {
       case "imageInput": {
         if (!resolvedOptions.includeInputNodes) break;
-        const preview = (d.imagePreview || d.imageUrl) as string | undefined;
+        const preview =
+          pickInlineOrBlobUrl(d.imagePreview as string | undefined, d.imagePreviewBlobId as string | undefined) ??
+          pickInlineOrBlobUrl(d.imageUrl as string | undefined, d.imageUrlBlobId as string | undefined);
         await addUrl(preview, `${sid}-input`);
         if (out?.image_url) await addUrl(out.image_url, `${sid}-out`);
-        else addRawBase64IfNeeded(out?.image_base64, node.id, "b64");
+        else {
+          const b64Url = pickInlineOrBlobUrl(out?.image_base64, d.imageBase64BlobId as string | undefined);
+          if (b64Url && b64Url.startsWith("/api/")) await addUrl(b64Url, `${sid}-out`);
+          else addRawBase64IfNeeded(out?.image_base64, node.id, "b64");
+        }
         break;
       }
       case "mediaInput": {
         if (!resolvedOptions.includeInputNodes) break;
         const mediaType = d.mediaType as string | undefined;
         if (mediaType === "image") {
-          await addUrl(d.preview as string | undefined, `${sid}-media`);
+          const imgUrl = pickInlineOrBlobUrl(d.preview as string | undefined, d.previewBlobId as string | undefined);
+          await addUrl(imgUrl, `${sid}-media`);
         }
         if (mediaType === "video") {
-          await addUrl(d.preview as string | undefined, `${sid}-preview`);
-          await addUrl(d.videoDataUrl as string | undefined, `${sid}-videodata`);
+          const vidPreview = pickInlineOrBlobUrl(d.preview as string | undefined, d.previewBlobId as string | undefined);
+          await addUrl(vidPreview, `${sid}-preview`);
+          const vidData = pickInlineOrBlobUrl(d.videoDataUrl as string | undefined, d.videoDataUrlBlobId as string | undefined);
+          await addUrl(vidData, `${sid}-videodata`);
         }
         if (mediaType === "audio") {
           const u = pickInlineOrBlobUrl(
@@ -242,7 +251,8 @@ export async function buildStudioMediaZip(
       }
       case "imageGen": {
         if (!resolvedOptions.includeImageGenNodes) break;
-        await addUrl(d.generatedImage as string | undefined, `${sid}-generated`);
+        const genImg = pickInlineOrBlobUrl(d.generatedImage as string | undefined, d.generatedImageBlobId as string | undefined);
+        await addUrl(genImg, `${sid}-generated`);
         if (out?.image_url) await addUrl(out.image_url, `${sid}-out`);
         break;
       }

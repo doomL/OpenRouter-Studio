@@ -10,7 +10,7 @@ import { readJsonResponse } from "@/lib/read-json-response";
 import { buildLightLocalBackup } from "@/lib/studio-local-backup";
 import { toast } from "@/lib/toast";
 
-const DEBOUNCE_STRUCTURAL_MS = 600;
+const DEBOUNCE_STRUCTURAL_MS = 5000;
 /** Layout-only saves (drag, select): avoid hammering the server with full JSON. */
 const DEBOUNCE_LAYOUT_MS = 10_000;
 const LS_BACKUP_KEY = "or-studio-backup";
