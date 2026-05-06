@@ -102,12 +102,12 @@ const plans = [
     ],
   },
   {
-    name: "Cloud",
-    price: "$5",
-    period: "/month",
-    description: "Hosted Studio — sign in and build without installing anything.",
+    name: "Cloud Beta",
+    price: "Free",
+    period: "3-day trial",
+    description: "Hosted Studio in private beta — sign in and build without installing anything.",
     icon: CloudIcon,
-    cta: "Start free",
+    cta: "Start free trial",
     ctaHref: "/auth/register",
     highlight: true,
     features: [
@@ -115,7 +115,7 @@ const plans = [
       "Cloud-hosted — nothing to install",
       "Account & saved sessions",
       "Bring your own OpenRouter API key",
-      "Email support",
+      "3-day free trial, then request access",
       "Automatic updates",
     ],
   },
@@ -172,7 +172,7 @@ export default async function LandingPage() {
         <div className="relative mx-auto max-w-6xl px-6 pt-24 pb-20 text-center">
           <div className="inline-flex items-center gap-2 rounded-full border border-[#ff6b35]/30 bg-[#ff6b35]/10 px-4 py-1.5 text-xs text-[#c2410c] dark:text-[#ff9b70] mb-8">
             <ZapIcon className="size-3" />
-            Video generation available now
+            Private beta — 3-day free trial
           </div>
 
           <h1 className="text-5xl sm:text-6xl font-extrabold tracking-tight leading-[1.1] max-w-3xl mx-auto text-foreground">
@@ -267,7 +267,7 @@ export default async function LandingPage() {
           <div className="text-center mb-16">
             <h2 className="text-3xl font-bold text-foreground">Simple, transparent pricing</h2>
             <p className="mt-3 text-muted-foreground text-lg">
-              Self-host for free or use the cloud app. You always bring your own OpenRouter API key.
+              Self-host for free or try the cloud beta. You always bring your own OpenRouter API key.
             </p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto">
@@ -282,7 +282,7 @@ export default async function LandingPage() {
               >
                 {plan.highlight && (
                   <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-[#ff6b35] px-3 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
-                    Cloud
+                    Beta
                   </div>
                 )}
                 <div className="flex items-center gap-2 mb-4">

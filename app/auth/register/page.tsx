@@ -66,6 +66,11 @@ export default function RegisterPage() {
             </span>
           </Link>
           <p className="text-sm text-muted-foreground mt-2">Create your account</p>
+          <div className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-600 dark:text-amber-400">
+            🎉 3-day free trial — no payment required. After the trial, contact{" "}
+            <a href="mailto:laurito.dom@gmail.com" className="underline underline-offset-2">laurito.dom@gmail.com</a>{" "}
+            to request full access.
+          </div>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">

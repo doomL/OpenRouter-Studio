@@ -17,6 +17,10 @@ export default async function StudioHomePage() {
   }
   const userId = session.user.id;
 
+  const userRow = await prisma.user.findUnique({ where: { id: userId }, select: { trialEndsAt: true } });
+  const trialEndsAt = userRow?.trialEndsAt ?? null;
+  const trialDaysLeft = trialEndsAt ? Math.ceil((trialEndsAt.getTime() - Date.now()) / 86400000) : null;
+
   const row = await prisma.userStudioState.findUnique({
     where: { userId },
     select: { updatedAt: true, workflows: true, nodes: true },
@@ -61,38 +65,52 @@ export default async function StudioHomePage() {
             <ThemeToggle />
             <Link
               href="/media"
+              title="Media library"
               className={cn(
                 "inline-flex shrink-0 items-center justify-center gap-1 rounded-lg border border-border",
-                "bg-background px-2.5 h-7 text-[0.8rem] font-medium hover:bg-muted transition-colors"
+                "bg-background px-2 sm:px-2.5 h-7 text-[0.8rem] font-medium hover:bg-muted transition-colors"
               )}
             >
               <ImageIcon className="size-3.5" />
-              Media
+              <span className="hidden sm:inline">Media</span>
             </Link>
             <Link
               href="/settings"
+              title="Settings"
               className={cn(
                 "inline-flex shrink-0 items-center justify-center gap-1 rounded-lg border border-border",
-                "bg-background px-2.5 h-7 text-[0.8rem] font-medium hover:bg-muted transition-colors"
+                "bg-background px-2 sm:px-2.5 h-7 text-[0.8rem] font-medium hover:bg-muted transition-colors"
               )}
             >
               <SettingsIcon className="size-3.5" />
-              Settings
+              <span className="hidden sm:inline">Settings</span>
             </Link>
             <Link
               href="/studio"
               className={cn(
                 "inline-flex shrink-0 items-center justify-center gap-1 rounded-lg border border-border",
-                "bg-background px-2.5 h-7 text-[0.8rem] font-medium hover:bg-muted transition-colors"
+                "bg-background px-2 sm:px-2.5 h-7 text-[0.8rem] font-medium hover:bg-muted transition-colors"
               )}
             >
-              Open canvas
+              <span className="hidden sm:inline">Open canvas</span>
               <ArrowRightIcon className="size-3.5" />
             </Link>
             <HomeSignOutButton />
           </div>
         </div>
       </header>
+
+      {trialDaysLeft !== null && trialDaysLeft >= 0 && (
+        <div className="border-b border-amber-500/30 bg-amber-500/10 px-4 py-2 text-center text-xs text-amber-600 dark:text-amber-400">
+          ⏳{" "}
+          {trialDaysLeft === 0
+            ? "Your free trial expires today."
+            : `${trialDaysLeft} day${trialDaysLeft === 1 ? "" : "s"} left in your free trial.`}{" "}
+          <a href="mailto:laurito.dom@gmail.com?subject=OpenRouter Studio - Beta Access Request" className="font-medium underline underline-offset-2 hover:opacity-80">
+            Request full access →
+          </a>
+        </div>
+      )}
 
       <main className="mx-auto max-w-5xl px-4 py-10 space-y-10">
         <section>
