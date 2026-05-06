@@ -313,13 +313,13 @@ function StudioPageContent() {
               <SettingsIcon className="size-3.5" />
             </Link>
             <ThemedLogo className="h-6 w-6" />
-            <span className="text-sm font-bold tracking-tight">
+            <span className="hidden sm:inline text-sm font-bold tracking-tight">
               <span className="text-[#ff6b35]">OpenRouter</span>{" "}
               <span className="text-foreground">Studio</span>
             </span>
           </div>
 
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 overflow-x-auto scrollbar-none">
             {/* Undo / Redo */}
             <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={undo} title="Undo (Ctrl+Z)">
               <Undo2Icon className="size-3.5" />
@@ -340,7 +340,7 @@ function StudioPageContent() {
               title="Run all nodes in order"
             >
               <PlayIcon className="size-3.5" />
-              {isRunningAll ? "Running..." : "Run All"}
+              <span className="hidden sm:inline">{isRunningAll ? "Running..." : "Run All"}</span>
             </Button>
 
             <div className="mx-1 h-4 w-px bg-studio-node-border" />
@@ -366,11 +366,11 @@ function StudioPageContent() {
               className="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs hover:bg-accent transition-colors"
             >
               <span
-                className={`h-2 w-2 rounded-full ${
+                className={`h-2 w-2 shrink-0 rounded-full ${
                   apiKey ? "bg-green-500" : "bg-red-500"
                 }`}
               />
-              <span className="text-muted-foreground">
+              <span className="hidden sm:inline text-muted-foreground">
                 {apiKey ? "API Connected" : "No API Key"}
               </span>
             </button>
@@ -391,12 +391,12 @@ function StudioPageContent() {
               }}
             >
               <PlusIcon className="size-3.5" />
-              New
+              <span className="hidden sm:inline">New</span>
             </Button>
 
             <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={handleSave}>
               <SaveIcon className="size-3.5" />
-              Save
+              <span className="hidden sm:inline">Save</span>
             </Button>
 
             <DropdownMenu>
@@ -404,7 +404,7 @@ function StudioPageContent() {
                 className="inline-flex h-7 items-center justify-center gap-1 rounded-md px-3 text-xs font-medium text-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
               >
                 <FolderOpenIcon className="size-3.5" />
-                Load
+                <span className="hidden sm:inline">Load</span>
               </DropdownMenuTrigger>
               <DropdownMenuContent
                 align="end"
@@ -478,7 +478,7 @@ function StudioPageContent() {
               title="Download all images and videos as ZIP"
             >
               <FolderArchiveIcon className="size-3.5" />
-              {isDownloadingMediaZip ? "Zipping..." : "Media ZIP"}
+              <span className="hidden sm:inline">{isDownloadingMediaZip ? "Zipping..." : "Media ZIP"}</span>
             </Button>
             <input
               ref={fileInputRef}
@@ -497,7 +497,7 @@ function StudioPageContent() {
                     className="inline-flex h-7 items-center justify-center gap-1.5 rounded-md px-2 text-xs font-medium text-foreground hover:bg-accent transition-colors"
                   >
                     <UserIcon className="size-3.5" />
-                    <span className="max-w-[80px] truncate text-muted-foreground">
+                    <span className="hidden sm:inline max-w-[80px] truncate text-muted-foreground">
                       {session.user.name || session.user.email}
                     </span>
                   </DropdownMenuTrigger>

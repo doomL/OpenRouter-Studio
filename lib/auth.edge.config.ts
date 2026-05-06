@@ -25,14 +25,25 @@ export const edgeAuthConfig = {
     }),
   ],
   callbacks: {
-    authorized({ auth }) {
-      return !!auth?.user;
+    authorized({ auth, request }) {
+      if (!auth?.user) return false;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const trialEndsAt = (auth.user as any).trialEndsAt as string | null | undefined;
+      if (trialEndsAt && new Date(trialEndsAt) < new Date()) {
+        const { pathname } = new URL(request.url);
+        if (!pathname.startsWith("/auth/")) {
+          return Response.redirect(new URL("/auth/trial-expired", request.url));
+        }
+      }
+      return true;
     },
     async jwt({ token, user, trigger, session }) {
       if (user) {
         token.id = user.id;
         token.name = user.name;
         token.email = user.email;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        token.trialEndsAt = (user as any).trialEndsAt ?? null;
       }
       if (trigger === "update" && session && typeof session === "object") {
         const s = session as { name?: string };
@@ -52,6 +63,8 @@ export const edgeAuthConfig = {
       if (typeof token.email === "string") {
         session.user.email = token.email;
       }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (session.user as any).trialEndsAt = token.trialEndsAt ?? null;
       return session;
     },
   },

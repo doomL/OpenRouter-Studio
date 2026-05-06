@@ -34,7 +34,12 @@ export const authConfig = {
         );
         if (!valid) return null;
 
-        return { id: user.id, name: user.name, email: user.email };
+        return {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          trialEndsAt: user.trialEndsAt?.toISOString() ?? null,
+        };
       },
     }),
   ],
@@ -44,6 +49,8 @@ export const authConfig = {
         token.id = user.id;
         token.name = user.name;
         token.email = user.email;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        token.trialEndsAt = (user as any).trialEndsAt ?? null;
       }
       if (trigger === "update" && session && typeof session === "object") {
         const s = session as { name?: string };
