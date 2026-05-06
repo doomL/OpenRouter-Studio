@@ -114,7 +114,7 @@ function StudioPageContent() {
     const wf = list.find((w) => w.id === workflowIdFromUrl);
     if (wf) {
       loadWorkflow(workflowIdFromUrl);
-      toast.success(`Loaded “${wf.name}”`);
+      toast.success(`Loaded "${wf.name}"`);
     } else {
       toast.error("Saved workflow not found. It may have been deleted.");
     }
@@ -130,7 +130,7 @@ function StudioPageContent() {
     (name: string) => {
       saveWorkflow(name);
       void saveStudioSettingsToServer();
-      toast.success(`Saved “${name}”`);
+      toast.success(`Saved "${name}"`);
     },
     [saveWorkflow]
   );
@@ -280,36 +280,16 @@ function StudioPageContent() {
     <ReactFlowProvider>
       <div className="flex h-screen flex-col bg-studio-bg text-foreground">
         {/* Header */}
-        <header className="flex h-12 flex-shrink-0 items-center justify-between border-b border-studio-node-border bg-studio-bg px-4">
-          <div className="flex items-center gap-2.5">
-            <Link
-              href="/home"
-              title="Home"
-              className={cn(
-                "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md",
-                "text-foreground hover:bg-accent transition-colors"
-              )}
-            >
+        <header className="flex h-12 flex-shrink-0 items-center justify-between border-b border-studio-node-border bg-studio-bg px-2 sm:px-4 gap-2">
+          {/* Left: nav links + logo */}
+          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2.5">
+            <Link href="/home" title="Home" className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-foreground hover:bg-accent transition-colors">
               <LayoutDashboardIcon className="size-3.5" />
             </Link>
-            <Link
-              href="/media"
-              title="Media library"
-              className={cn(
-                "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md",
-                "text-foreground hover:bg-accent transition-colors"
-              )}
-            >
+            <Link href="/media" title="Media library" className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-foreground hover:bg-accent transition-colors">
               <ImageIcon className="size-3.5" />
             </Link>
-            <Link
-              href="/settings"
-              title="Settings"
-              className={cn(
-                "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md",
-                "text-foreground hover:bg-accent transition-colors"
-              )}
-            >
+            <Link href="/settings" title="Settings" className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-foreground hover:bg-accent transition-colors">
               <SettingsIcon className="size-3.5" />
             </Link>
             <ThemedLogo className="h-6 w-6" />
@@ -319,40 +299,32 @@ function StudioPageContent() {
             </span>
           </div>
 
-          <div className="flex items-center gap-1 overflow-x-auto scrollbar-none">
-            {/* Undo / Redo */}
-            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={undo} title="Undo (Ctrl+Z)">
-              <Undo2Icon className="size-3.5" />
-            </Button>
-            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={redo} title="Redo (Ctrl+Shift+Z)">
-              <Redo2Icon className="size-3.5" />
-            </Button>
-
-            <div className="mx-1 h-4 w-px bg-studio-node-border" />
+          {/* Right: toolbar */}
+          <div className="flex min-w-0 items-center gap-0.5 sm:gap-1">
+            {/* Undo / Redo — hidden on mobile */}
+            <div className="hidden sm:flex items-center gap-0.5">
+              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={undo} title="Undo (Ctrl+Z)">
+                <Undo2Icon className="size-3.5" />
+              </Button>
+              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={redo} title="Redo (Ctrl+Shift+Z)">
+                <Redo2Icon className="size-3.5" />
+              </Button>
+              <div className="mx-1 h-4 w-px bg-studio-node-border" />
+            </div>
 
             {/* Run All */}
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 text-xs gap-1"
-              onClick={handleRunAll}
-              disabled={isRunningAll || nodes.length === 0}
-              title="Run all nodes in order"
-            >
+            <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 px-2" onClick={handleRunAll} disabled={isRunningAll || nodes.length === 0} title="Run all nodes in order">
               <PlayIcon className="size-3.5" />
               <span className="hidden sm:inline">{isRunningAll ? "Running..." : "Run All"}</span>
             </Button>
 
-            <div className="mx-1 h-4 w-px bg-studio-node-border" />
+            <div className="mx-0.5 sm:mx-1 h-4 w-px bg-studio-node-border" />
 
-            {/* Cost tracker */}
+            {/* Cost tracker — hidden on mobile */}
             {sessionCost > 0 && (
               <button
-                onClick={() => {
-                  resetCost();
-                  toast.success("Session cost cleared");
-                }}
-                className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-accent transition-colors"
+                onClick={() => { resetCost(); toast.success("Session cost cleared"); }}
+                className="hidden sm:flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-accent transition-colors"
                 title="Session cost (click to reset)"
               >
                 <DollarSignIcon className="size-3" />
@@ -361,88 +333,45 @@ function StudioPageContent() {
             )}
 
             {/* API status */}
-            <button
-              onClick={() => setShowApiKey(true)}
-              className="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs hover:bg-accent transition-colors"
-            >
-              <span
-                className={`h-2 w-2 shrink-0 rounded-full ${
-                  apiKey ? "bg-green-500" : "bg-red-500"
-                }`}
-              />
-              <span className="hidden sm:inline text-muted-foreground">
-                {apiKey ? "API Connected" : "No API Key"}
-              </span>
+            <button onClick={() => setShowApiKey(true)} className="flex items-center gap-1.5 rounded-md px-1.5 sm:px-2 py-1 text-xs hover:bg-accent transition-colors" title={apiKey ? "API Connected" : "No API Key — click to add"}>
+              <span className={`h-2 w-2 shrink-0 rounded-full ${apiKey ? "bg-green-500" : "bg-red-500"}`} />
+              <span className="hidden sm:inline text-muted-foreground">{apiKey ? "API Connected" : "No API Key"}</span>
             </button>
 
-            <div className="mx-1 h-4 w-px bg-studio-node-border" />
+            <div className="mx-0.5 sm:mx-1 h-4 w-px bg-studio-node-border" />
 
+            {/* Theme toggle */}
             <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={toggleTheme}>
               {theme === "dark" ? <SunIcon className="size-3.5" /> : <MoonIcon className="size-3.5" />}
             </Button>
 
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 text-xs gap-1"
-              onClick={() => {
-                newWorkflow();
-                toast.success("New canvas");
-              }}
-            >
+            {/* New / Save / Load */}
+            <Button variant="ghost" size="sm" className="h-7 w-7 sm:w-auto sm:px-2 text-xs gap-1 p-0 sm:p-1" onClick={() => { newWorkflow(); toast.success("New canvas"); }} title="New canvas">
               <PlusIcon className="size-3.5" />
               <span className="hidden sm:inline">New</span>
             </Button>
-
-            <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={handleSave}>
+            <Button variant="ghost" size="sm" className="h-7 w-7 sm:w-auto sm:px-2 text-xs gap-1 p-0 sm:p-1" onClick={handleSave} title="Save workflow">
               <SaveIcon className="size-3.5" />
               <span className="hidden sm:inline">Save</span>
             </Button>
 
             <DropdownMenu>
-              <DropdownMenuTrigger
-                className="inline-flex h-7 items-center justify-center gap-1 rounded-md px-3 text-xs font-medium text-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
-              >
+              <DropdownMenuTrigger className="inline-flex h-7 items-center justify-center gap-1 rounded-md px-1.5 sm:px-3 text-xs font-medium text-foreground hover:bg-accent hover:text-accent-foreground transition-colors" title="Load workflow">
                 <FolderOpenIcon className="size-3.5" />
                 <span className="hidden sm:inline">Load</span>
               </DropdownMenuTrigger>
-              <DropdownMenuContent
-                align="end"
-                className="min-w-[260px] max-w-[min(100vw-1.5rem,360px)]"
-                {...getCanvasViewportFloatingProps()}
-              >
+              <DropdownMenuContent align="end" className="min-w-[260px] max-w-[min(100vw-1.5rem,360px)]" {...getCanvasViewportFloatingProps()}>
                 {workflows.length === 0 ? (
-                  <DropdownMenuItem disabled className="text-xs">
-                    No saved workflows
-                  </DropdownMenuItem>
+                  <DropdownMenuItem disabled className="text-xs">No saved workflows</DropdownMenuItem>
                 ) : (
                   workflows.map((w) => (
-                    <DropdownMenuItem
-                      key={w.id}
-                      className="text-xs cursor-pointer flex flex-col gap-0.5 items-stretch py-2"
-                      onClick={() => {
-                        loadWorkflow(w.id);
-                        toast.success(`Loaded “${w.name}”`);
-                      }}
-                    >
+                    <DropdownMenuItem key={w.id} className="text-xs cursor-pointer flex flex-col gap-0.5 items-stretch py-2" onClick={() => { loadWorkflow(w.id); toast.success(`Loaded "${w.name}"`); }}>
                       <div className="flex justify-between gap-2 items-start w-full">
                         <span className="font-medium truncate text-left">{w.name}</span>
-                        <button
-                          type="button"
-                          className="shrink-0 rounded p-0.5 text-muted-foreground hover:text-destructive transition-colors"
-                          onPointerDown={(e) => {
-                            e.stopPropagation();
-                          }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            e.preventDefault();
-                            // Open after menu closes so the dialog isn’t dismissed by the same pointer event
-                            queueMicrotask(() => {
-                              setWorkflowToDelete({ id: w.id, name: w.name });
-                            });
-                          }}
-                          aria-label={`Delete ${w.name}`}
-                        >
+                        <button type="button" className="shrink-0 rounded p-0.5 text-muted-foreground hover:text-destructive transition-colors"
+                          onPointerDown={(e) => e.stopPropagation()}
+                          onClick={(e) => { e.stopPropagation(); e.preventDefault(); queueMicrotask(() => setWorkflowToDelete({ id: w.id, name: w.name })); }}
+                          aria-label={`Delete ${w.name}`}>
                           <Trash2Icon className="size-3.5" />
                         </button>
                       </div>
@@ -459,43 +388,29 @@ function StudioPageContent() {
               </DropdownMenuContent>
             </DropdownMenu>
 
-            {/* Export / Import */}
-            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={handleExport} title="Export workflow as JSON">
-              <DownloadIcon className="size-3.5" />
-            </Button>
-            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={handleImport} title="Import workflow from JSON">
-              <UploadIcon className="size-3.5" />
-            </Button>
+            {/* Export / Import / Media ZIP — hidden on mobile */}
+            <div className="hidden sm:flex items-center gap-0.5">
+              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={handleExport} title="Export workflow as JSON">
+                <DownloadIcon className="size-3.5" />
+              </Button>
+              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={handleImport} title="Import workflow from JSON">
+                <UploadIcon className="size-3.5" />
+              </Button>
+              <div className="mx-1 h-4 w-px bg-studio-node-border" />
+              <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={handleDownloadAllMedia} disabled={isDownloadingMediaZip} title="Download all images and videos as ZIP">
+                <FolderArchiveIcon className="size-3.5" />
+                {isDownloadingMediaZip ? "Zipping..." : "Media ZIP"}
+              </Button>
+            </div>
 
-            <div className="mx-1 h-4 w-px bg-studio-node-border" />
-
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 text-xs gap-1"
-              onClick={handleDownloadAllMedia}
-              disabled={isDownloadingMediaZip}
-              title="Download all images and videos as ZIP"
-            >
-              <FolderArchiveIcon className="size-3.5" />
-              <span className="hidden sm:inline">{isDownloadingMediaZip ? "Zipping..." : "Media ZIP"}</span>
-            </Button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".json"
-              className="hidden"
-              onChange={handleFileImport}
-            />
+            <input ref={fileInputRef} type="file" accept=".json" className="hidden" onChange={handleFileImport} />
 
             {/* User menu */}
             {session?.user && (
               <>
-                <div className="mx-1 h-4 w-px bg-studio-node-border" />
+                <div className="mx-0.5 sm:mx-1 h-4 w-px bg-studio-node-border" />
                 <DropdownMenu>
-                  <DropdownMenuTrigger
-                    className="inline-flex h-7 items-center justify-center gap-1.5 rounded-md px-2 text-xs font-medium text-foreground hover:bg-accent transition-colors"
-                  >
+                  <DropdownMenuTrigger className="inline-flex h-7 items-center justify-center gap-1.5 rounded-md px-1.5 sm:px-2 text-xs font-medium text-foreground hover:bg-accent transition-colors">
                     <UserIcon className="size-3.5" />
                     <span className="hidden sm:inline max-w-[80px] truncate text-muted-foreground">
                       {session.user.name || session.user.email}
@@ -505,12 +420,20 @@ function StudioPageContent() {
                     <DropdownMenuItem className="text-xs text-muted-foreground" disabled>
                       {session.user.email}
                     </DropdownMenuItem>
+                    {(() => {
+                      const trialEndsAt = (session.user as { trialEndsAt?: string | null }).trialEndsAt;
+                      if (!trialEndsAt) return null;
+                      const daysLeft = Math.ceil((new Date(trialEndsAt).getTime() - Date.now()) / 86400000);
+                      if (daysLeft < 0) return null;
+                      return (
+                        <DropdownMenuItem className="text-xs text-amber-500 gap-1.5" disabled>
+                          ⏳ {daysLeft === 0 ? "Trial expires today" : `${daysLeft}d left in trial`}
+                        </DropdownMenuItem>
+                      );
+                    })()}
                     <DropdownMenuItem
                       className="text-xs text-red-400 gap-1.5"
-                      onClick={() => {
-                        useStudioStore.getState().clearStudioForLogout();
-                        void signOutAtCurrentOrigin("/");
-                      }}
+                      onClick={() => { useStudioStore.getState().clearStudioForLogout(); void signOutAtCurrentOrigin("/"); }}
                     >
                       <LogOutIcon className="size-3" />
                       Sign out
@@ -521,6 +444,22 @@ function StudioPageContent() {
             )}
           </div>
         </header>
+
+        {/* Trial banner */}
+        {(() => {
+          const trialEndsAt = (session?.user as { trialEndsAt?: string | null } | undefined)?.trialEndsAt;
+          if (!trialEndsAt) return null;
+          const daysLeft = Math.ceil((new Date(trialEndsAt).getTime() - Date.now()) / 86400000);
+          if (daysLeft < 0) return null;
+          return (
+            <div className="flex shrink-0 items-center justify-center gap-2 border-b border-amber-500/30 bg-amber-500/10 px-4 py-1 text-xs text-amber-600 dark:text-amber-400">
+              <span>⏳ {daysLeft === 0 ? "Your trial expires today." : `${daysLeft} day${daysLeft === 1 ? "" : "s"} left in your free trial.`}</span>
+              <a href="mailto:laurito.dom@gmail.com?subject=OpenRouter Studio - Beta Access Request" className="font-medium underline underline-offset-2 hover:opacity-80">
+                Request full access →
+              </a>
+            </div>
+          );
+        })()}
 
         {/* Main content */}
         <div className="flex flex-1 overflow-hidden">
@@ -554,7 +493,7 @@ function StudioPageContent() {
               const name = workflowToDelete.name;
               deleteWorkflow(workflowToDelete.id);
               void saveStudioSettingsToServer();
-              toast.success(`Deleted “${name}”`);
+              toast.success(`Deleted "${name}"`);
             }
           }}
         />
