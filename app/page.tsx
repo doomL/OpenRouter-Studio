@@ -140,12 +140,11 @@ export default async function LandingPage() {
             </span>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
-            <ThemeToggle />
             <a
               href={GITHUB_REPO}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+              className="hidden sm:flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
               <GitHubIcon className="size-4" />
               GitHub
@@ -158,10 +157,11 @@ export default async function LandingPage() {
             </Link>
             <Link
               href="/auth/register"
-              className="rounded-lg bg-[#ff6b35] px-4 py-2 text-sm font-semibold text-white hover:bg-[#e55a28] transition-colors"
+              className="hidden sm:inline-flex rounded-lg bg-[#ff6b35] px-4 py-2 text-sm font-semibold text-white hover:bg-[#e55a28] transition-colors"
             >
               Get Started
             </Link>
+            <ThemeToggle />
           </div>
         </div>
       </nav>
