@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/doomL/OpenRouter-Studio/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg?style=flat-square" alt="Apache License 2.0" /></a>
+  <a href="https://github.com/doomL/OpenRouter-Studio/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0_with_Commons_Clause-red.svg?style=flat-square" alt="Apache 2.0 with Commons Clause" /></a>
   <a href="https://github.com/doomL/OpenRouter-Studio/blob/main/NOTICE"><img src="https://img.shields.io/badge/NOTICE-trademark%20%26%20IP-informational?style=flat-square" alt="NOTICE" /></a>
   <a href="https://nextjs.org/"><img src="https://img.shields.io/badge/Next.js-16-black?style=flat-square&logo=next.js&logoColor=white" alt="Next.js 16" /></a>
   <a href="https://react.dev/"><img src="https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black" alt="React 19" /></a>
@@ -81,11 +81,11 @@ Compose runs **PostgreSQL 16** (`postgres`), **MinIO** (`minio`) for an S3-compa
 
 The stack uses **`restart: unless-stopped`** on long-running services so it comes back after host reboots or process crashes (for example OOM). That reduces downtime but does not remove the need to keep API payloads small.
 
-Inside Compose, **`STUDIO_S3_*`** defaults point at **`http://minio:9000`** with bucket **`studio-media`** and credentials **`STUDIO_S3_ACCESS_KEY`** / **`STUDIO_S3_SECRET_KEY`** (change in **`.env`** for production). MinIO’s ports are bound to **loopback only** (`127.0.0.1`), so the Console is **`http://127.0.0.1:${MINIO_CONSOLE_PORT:-9001}`** and the S3 API **`http://127.0.0.1:${MINIO_PORT:-9000}`** from the host (not reachable from other machines). To use **external** S3 instead (managed AWS, another MinIO, Garage, etc.), set those variables in **`.env`** and remove or replace the `minio` / `minio-init` services and the app’s **`depends_on: minio-init`** in **`docker-compose.yml`**.
+Inside Compose, **`STUDIO_S3_*`** defaults point at **`http://minio:9000`** with bucket **`studio-media`** and credentials **`STUDIO_S3_ACCESS_KEY`** / **`STUDIO_S3_SECRET_KEY`** (change in **`.env`** for production). MinIO's ports are bound to **loopback only** (`127.0.0.1`), so the Console is **`http://127.0.0.1:${MINIO_CONSOLE_PORT:-9001}`** and the S3 API **`http://127.0.0.1:${MINIO_PORT:-9000}`** from the host (not reachable from other machines). To use **external** S3 instead (managed AWS, another MinIO, Garage, etc.), set those variables in **`.env`** and remove or replace the `minio` / `minio-init` services and the app's **`depends_on: minio-init`** in **`docker-compose.yml`**.
 
 ### Node.js heap vs container RAM
 
-Compose sets **`NODE_OPTIONS=--max-old-space-size=4096`** as a reasonable default. That value is the **V8 old-generation heap ceiling in megabytes**, not “all memory used by the process.” Setting it **much lower** (for example 2048) **caps** the runtime on purpose. Setting it **far above** available RAM does not create physical memory and can make behavior worse. Tune it to roughly **75% of the memory you can afford** for the Node process.
+Compose sets **`NODE_OPTIONS=--max-old-space-size=4096`** as a reasonable default. That value is the **V8 old-generation heap ceiling in megabytes**, not "all memory used by the process." Setting it **much lower** (for example 2048) **caps** the runtime on purpose. Setting it **far above** available RAM does not create physical memory and can make behavior worse. Tune it to roughly **75% of the memory you can afford** for the Node process.
 
 ### Studio media blobs (S3 / MinIO)
 
@@ -159,14 +159,26 @@ For payload details and model notes, see **`openrouter-studio-prompt.md`** and *
 
 ## License & intellectual property
 
-This repository is licensed under the **[Apache License 2.0](LICENSE)**. You may use, modify, and distribute the software for commercial and non-commercial purposes, subject to the terms of that license (including the patent grant where applicable). See the license text for full conditions.
+This repository is licensed under the **[Apache License 2.0 with Commons Clause](LICENSE)**.
 
-- **Copyright:** [NOTICE](NOTICE) states project copyright and trademark notices required or recommended when redistributing under Apache 2.0. If you are the sole copyright holder preparing a sale or exclusive license, replace *OpenRouter Studio authors* in `LICENSE`, `NOTICE`, and this file with your legal name or entity so counterparties can identify assignable rights.
+### What you can do
+- Use, study, and modify the software for personal or internal business purposes.
+- Distribute modified or unmodified copies, provided you include this license and all attribution notices.
+- Build products or internal workflows on top of OpenRouter Studio for your own use.
+
+### What you cannot do
+- **Sell** the software or any product or service whose value derives substantially from its functionality — including hosting it as a paid SaaS, offering it as a managed service, or reselling it as part of a commercial offering — without a separate written commercial license from the authors.
+
+"Sell" is defined as described in the Commons Clause condition at the top of the [LICENSE](LICENSE) file.
+
+### Commercial licensing
+
+If you want to offer OpenRouter Studio (or a derivative) as a paid product or service, contact the authors to discuss a commercial license. Nothing in the Apache 2.0 license obligates the authors to grant additional rights beyond the public license; anything beyond it requires a separate written agreement.
+
+**How to reach out:** use GitHub Discussions or Issues on this repository, or your usual business development channel, and reference "OpenRouter Studio / commercial license."
+
+### Copyright & trademarks
+
+- **Copyright:** [NOTICE](NOTICE) states project copyright and trademark notices required when redistributing. If you are the sole copyright holder preparing a sale or exclusive license of this codebase, replace *OpenRouter Studio authors* in `LICENSE`, `NOTICE`, and this file with your legal name or entity so counterparties can identify assignable rights.
 - **Trademarks:** *OpenRouter* and related marks belong to their respective owners. This studio is a separate product; the name refers to API compatibility only unless you have a separate trademark agreement.
 - **Dependencies:** Third-party packages remain under their own licenses.
-
-### For OpenRouter and strategic partners
-
-The maintainers welcome good-faith conversations about **acquisition**, **exclusive or enterprise licensing**, **official product or hosting integration**, or **partnership** with OpenRouter or other organizations. Nothing in the Apache license obliges the authors to grant additional rights beyond that license; anything beyond the public license is subject to a separate written agreement.
-
-**How to reach out:** use GitHub Discussions or Issues on this repository, or your usual business development channel, and reference “OpenRouter Studio / licensing or partnership.”
