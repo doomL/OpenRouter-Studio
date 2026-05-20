@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { fetchWithRetry, STUDIO_FETCH_MAX_ATTEMPTS } from "@/lib/fetch-with-retry";
+
+// Stream video directly from OpenRouter — no buffering in memory.
+// Supports Range requests so the browser can seek without re-downloading.
+export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   // Accept API key from header or query param (needed for <video src="..."> tags)
@@ -16,25 +19,43 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "jobId required" }, { status: 400 });
   }
 
-  try {
-    const url = `https://openrouter.ai/api/v1/videos/${encodeURIComponent(jobId)}/content?index=${index}`;
-    const res = await fetchWithRetry(
-      url,
-      { headers: { Authorization: `Bearer ${apiKey}` } },
-      { maxAttempts: STUDIO_FETCH_MAX_ATTEMPTS }
-    );
+  const upstreamUrl = `https://openrouter.ai/api/v1/videos/${encodeURIComponent(jobId)}/content?index=${index}`;
 
-    if (!res.ok) {
+  const upstreamHeaders: HeadersInit = {
+    Authorization: `Bearer ${apiKey}`,
+  };
+
+  // Forward Range header if the browser is seeking
+  const rangeHeader = req.headers.get("range");
+  if (rangeHeader) {
+    upstreamHeaders["Range"] = rangeHeader;
+  }
+
+  try {
+    const res = await fetch(upstreamUrl, { headers: upstreamHeaders });
+
+    if (!res.ok && res.status !== 206) {
       const err = await res.text();
       return NextResponse.json({ error: err }, { status: res.status });
     }
 
-    const blob = await res.blob();
-    return new NextResponse(blob, {
-      headers: {
-        "Content-Type": res.headers.get("Content-Type") || "video/mp4",
-        "Cache-Control": "private, max-age=3600",
-      },
+    const responseHeaders: HeadersInit = {
+      "Content-Type": res.headers.get("Content-Type") || "video/mp4",
+      "Cache-Control": "private, max-age=3600",
+      "Accept-Ranges": "bytes",
+    };
+
+    // Forward Content-Length and Content-Range so browser can track progress and seek
+    const contentLength = res.headers.get("Content-Length");
+    if (contentLength) responseHeaders["Content-Length"] = contentLength;
+
+    const contentRange = res.headers.get("Content-Range");
+    if (contentRange) responseHeaders["Content-Range"] = contentRange;
+
+    // Stream body directly — never buffer
+    return new NextResponse(res.body, {
+      status: res.status,
+      headers: responseHeaders,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Unknown error";
