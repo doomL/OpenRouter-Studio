@@ -61,6 +61,7 @@ function StudioPageContent() {
   const toggleTheme = useStudioStore((s) => s.toggleTheme);
   const workflows = useStudioStore((s) => s.workflows);
   const saveWorkflow = useStudioStore((s) => s.saveWorkflow);
+  const updateWorkflow = useStudioStore((s) => s.updateWorkflow);
   const loadWorkflow = useStudioStore((s) => s.loadWorkflow);
   const deleteWorkflow = useStudioStore((s) => s.deleteWorkflow);
   const newWorkflow = useStudioStore((s) => s.newWorkflow);
@@ -133,6 +134,15 @@ function StudioPageContent() {
       toast.success(`Saved "${name}"`);
     },
     [saveWorkflow]
+  );
+
+  const handleUpdateWorkflow = useCallback(
+    (id: string, name: string) => {
+      updateWorkflow(id);
+      void saveStudioSettingsToServer();
+      toast.success(`Updated "${name}"`);
+    },
+    [updateWorkflow]
   );
 
   const handleExport = useCallback(() => {
@@ -472,6 +482,8 @@ function StudioPageContent() {
           open={saveDialogOpen}
           onOpenChange={setSaveDialogOpen}
           onSave={handleConfirmSaveWorkflow}
+          onUpdate={handleUpdateWorkflow}
+          workflows={workflows}
         />
         <ExportWorkflowDialog
           open={exportDialogOpen}

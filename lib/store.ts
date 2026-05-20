@@ -228,6 +228,7 @@ interface StudioState {
   // Workflows
   workflows: Workflow[];
   saveWorkflow: (name: string) => void;
+  updateWorkflow: (id: string) => void;
   loadWorkflow: (id: string) => void;
   deleteWorkflow: (id: string) => void;
   newWorkflow: () => void;
@@ -523,9 +524,24 @@ export const useStudioStore = create<StudioState>()(
           nodes: stripNodesForLocalBackup(nodes),
           edges: JSON.parse(JSON.stringify(edges)) as Edge[],
         };
-        const updated = [workflow, ...workflows].slice(0, 10);
         set((s) => ({
-          workflows: updated,
+          workflows: [workflow, ...workflows],
+          cloudSaveMutationTier: foldCloudSaveTier(s.cloudSaveMutationTier, "structural"),
+        }));
+      },
+      updateWorkflow: (id) => {
+        const { nodes, edges, workflows } = get();
+        set((s) => ({
+          workflows: workflows.map((w) =>
+            w.id === id
+              ? {
+                  ...w,
+                  savedAt: new Date().toISOString(),
+                  nodes: stripNodesForLocalBackup(nodes),
+                  edges: JSON.parse(JSON.stringify(edges)) as Edge[],
+                }
+              : w
+          ),
           cloudSaveMutationTier: foldCloudSaveTier(s.cloudSaveMutationTier, "structural"),
         }));
       },
