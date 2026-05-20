@@ -32,7 +32,12 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const res = await fetch(upstreamUrl, { headers: upstreamHeaders });
+    // Pass the client's AbortSignal so upstream fetch cancels cleanly when the
+    // client disconnects — prevents "Controller is already closed" errors.
+    const res = await fetch(upstreamUrl, {
+      headers: upstreamHeaders,
+      signal: req.signal,
+    });
 
     if (!res.ok && res.status !== 206) {
       const err = await res.text();
@@ -58,6 +63,8 @@ export async function GET(req: NextRequest) {
       headers: responseHeaders,
     });
   } catch (e) {
+    // Client disconnected — not a real error, suppress it
+    if (e instanceof Error && e.name === "AbortError") return new NextResponse(null, { status: 499 });
     const msg = e instanceof Error ? e.message : "Unknown error";
     return NextResponse.json({ error: msg }, { status: 500 });
   }
