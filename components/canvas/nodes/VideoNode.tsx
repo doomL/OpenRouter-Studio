@@ -36,6 +36,7 @@ import {
   deriveVideoUiParams,
   normalizeVideoModelId,
 } from "@/lib/openrouter-video-models";
+import { enqueueVideoPersist } from "@/lib/video-persist-queue";
 
 function videoRefPreviewOrder(handle: string): number {
   if (handle === "first_frame") return 0;
@@ -173,16 +174,15 @@ function VideoNodeComponent({ id, data }: NodeProps) {
     });
   }, [id, nodeOutput?.video_url, persistedVideoUrl, setNodeOutput]);
 
-  /** After a job completes, fetch the MP4 once and stash a data URL on the node so cloud sync can upload it to object storage (MinIO/S3). */
+  /** After a job completes, fetch the MP4 once and stash a data URL on the node so cloud sync can upload it to object storage (MinIO/S3). Queued globally so only one video is fetched at a time. */
   useEffect(() => {
     if (videoJob?.status !== "completed" || !videoJob.jobId) return;
     if (outputVideoBlobId || hasPendingInlineOutput) return;
     const proxyUrl = `/api/openrouter/video/download?jobId=${videoJob.jobId}&index=0&key=${encodeURIComponent(apiKey)}`;
-    let cancelled = false;
-    void (async () => {
+    const cancelQueue = enqueueVideoPersist(async () => {
       try {
         const res = await fetch(proxyUrl);
-        if (cancelled || !res.ok) return;
+        if (!res.ok) return;
         const fresh = useStudioStore.getState().nodes.find((n) => n.id === id)?.data as
           | Record<string, unknown>
           | undefined;
@@ -199,15 +199,12 @@ function VideoNodeComponent({ id, data }: NodeProps) {
           r.onerror = () => reject(new Error("read"));
           r.readAsDataURL(blob);
         });
-        if (cancelled) return;
         updateNodeData(id, { outputVideoDataUrl: dataUrl });
       } catch {
         // Non-fatal; user can still use the time-limited proxy URL.
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
+    });
+    return cancelQueue;
   }, [
     apiKey,
     hasPendingInlineOutput,
