@@ -19,11 +19,11 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    // Fetch text/image models from the frontend API, video ids from v1, and
+    // Fetch text/image models from the public v1 API, video ids from v1, and
     // authoritative per-model constraints from the video models catalog (aspect ratios, durations, etc.).
     const [frontendRes, videoRes, videosMetaRes] = await Promise.all([
       fetchWithRetry(
-        "https://openrouter.ai/api/frontend/models",
+        "https://openrouter.ai/api/v1/models",
         {
           headers: {
             Authorization: `Bearer ${apiKey}`,
@@ -53,8 +53,24 @@ export async function GET(req: NextRequest) {
     }
 
     const json = await frontendRes.json();
-    const models = json.data || json;
-    const categorized = categorizeModels(Array.isArray(models) ? models : []);
+    const rawModels: Record<string, unknown>[] = Array.isArray(json.data || json) ? (json.data || json) : [];
+    // v1 models use `id` not `slug`, nest modalities under `architecture`, and have
+    // `pricing` at root. Normalize to the shape categorizeModels expects.
+    const models = rawModels.map((m) => {
+      if (typeof m.slug === "string") return m; // already frontend format (future-proof)
+      const arch = m.architecture as Record<string, unknown> | undefined;
+      return {
+        ...m,
+        slug: m.id,
+        input_modalities: arch?.input_modalities || [],
+        output_modalities: arch?.output_modalities || [],
+        endpoint: {
+          model_variant_slug: m.id,
+          pricing: m.pricing,
+        },
+      };
+    });
+    const categorized = categorizeModels(models);
 
     let videoCapsById = new Map<string, VideoGenerationCapabilities>();
     if (videosMetaRes?.ok) {
