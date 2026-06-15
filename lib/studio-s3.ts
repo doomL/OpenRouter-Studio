@@ -4,6 +4,9 @@ import {
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
+import { NodeHttpHandler } from "@smithy/node-http-handler";
+import * as http from "http";
+import * as https from "https";
 
 let cachedClient: S3Client | null = null;
 
@@ -29,6 +32,10 @@ export function getStudioS3Client(): S3Client {
       secretAccessKey: process.env.STUDIO_S3_SECRET_KEY!,
     },
     forcePathStyle: true,
+    requestHandler: new NodeHttpHandler({
+      httpAgent: new http.Agent({ maxSockets: 200 }),
+      httpsAgent: new https.Agent({ maxSockets: 200 }),
+    }),
   });
   return cachedClient;
 }
