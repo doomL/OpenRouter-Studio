@@ -33,8 +33,8 @@ export function getStudioS3Client(): S3Client {
     },
     forcePathStyle: true,
     requestHandler: new NodeHttpHandler({
-      httpAgent: new http.Agent({ maxSockets: 200 }),
-      httpsAgent: new https.Agent({ maxSockets: 200 }),
+      httpAgent: new http.Agent({ maxSockets: Infinity }),
+      httpsAgent: new https.Agent({ maxSockets: Infinity }),
     }),
   });
   return cachedClient;
