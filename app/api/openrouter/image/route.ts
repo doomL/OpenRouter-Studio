@@ -218,6 +218,22 @@ export async function POST(req: NextRequest) {
     const imageUrl = extractGeneratedImageUrl(message);
 
     if (imageUrl) {
+      // If the model returned an HTTP URL (e.g. a signed CDN URL that expires), fetch it
+      // server-side and return a data URL instead — otherwise the image disappears when
+      // the CDN URL expires and the workflow is reloaded.
+      if (imageUrl.startsWith("http://") || imageUrl.startsWith("https://")) {
+        try {
+          const imgRes = await fetch(imageUrl);
+          if (imgRes.ok) {
+            const contentType = (imgRes.headers.get("content-type") || "image/png").split(";")[0].trim();
+            const buf = await imgRes.arrayBuffer();
+            const dataUrl = `data:${contentType};base64,${Buffer.from(buf).toString("base64")}`;
+            return NextResponse.json({ data: [{ url: dataUrl }] });
+          }
+        } catch {
+          // Fetch failed — fall back to the original URL
+        }
+      }
       return NextResponse.json({ data: [{ url: imageUrl }] });
     }
 
